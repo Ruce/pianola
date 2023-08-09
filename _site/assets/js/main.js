@@ -39,12 +39,23 @@ class Piano {
 		this.prevHoverKey = null;
 	}
 	
+	static get keyboardRatio() {
+		return 1/8;
+	}
+	
 	static get blackKeyWidthRatio() {
 		return 1/2;
 	}
 	
 	static get blackKeyHeightRatio() {
 		return 2/3;
+	}
+	
+	static get keyFill() {
+		return {
+			'white': {'inactive': '#FEFEFE', 'active': '#FEF3B0'},
+			'black': {'inactive': '#595959', 'active': '#C09200'}
+		};
 	}
 	
 	// Key number of the white keys relative to an octave
@@ -132,7 +143,7 @@ class Piano {
 		
 		const ctx = this.canvas.getContext('2d');
 		this.canvas.width = window.innerWidth;
-		this.canvas.height = this.canvas.width / 7;
+		this.canvas.height = this.canvas.width * Piano.keyboardRatio;
 		ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
 		this.whiteKeyWidth = this.canvas.width / this.whiteKeys;
@@ -142,9 +153,9 @@ class Piano {
 		const [whiteKeyWidth, whiteKeyHeight, blackKeyWidth, blackKeyHeight] = [this.whiteKeyWidth, this.whiteKeyHeight, this.blackKeyWidth, this.blackKeyHeight];
 		
 		for (let i = 0; i < this.whiteKeys; i++) {
-			ctx.fillStyle = 'white';
+			ctx.fillStyle = Piano.keyFill.white.inactive;
 			if (hoverKeyDefined && hoverKey.isWhiteKey && hoverKey.colourKeyNum === i) {
-				ctx.fillStyle = 'yellow';
+				ctx.fillStyle = Piano.keyFill.white.active;
 			}
 			const x = i * whiteKeyWidth;
 			ctx.fillRect(x, 0, whiteKeyWidth, whiteKeyHeight);
@@ -152,9 +163,9 @@ class Piano {
 		}
 
 		for (let i = 0; i < this.blackKeys; i++) {
-			ctx.fillStyle = 'grey';
+			ctx.fillStyle = Piano.keyFill.black.inactive;
 			if (hoverKeyDefined && !hoverKey.isWhiteKey && hoverKey.colourKeyNum === i) {
-				ctx.fillStyle = 'yellow';
+				ctx.fillStyle = Piano.keyFill.black.active;
 			}
 			
 			const k = (i+4) % 5; // Index of the 5 black keys in `blackKeyPos`
