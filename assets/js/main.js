@@ -26,9 +26,14 @@ class PianoKey {
 
 class Piano {
 	constructor(canvasId, octaves) {
+		if (octaves < 1 || octaves > 7) {
+			throw new RangeError("The number of octaves must be between 1 and 7");
+		}
 		this.octaves = octaves;
 		this.whiteKeys = 7 * this.octaves + 3; // 3 additional keys before and after main octaves
 		this.blackKeys = 5 * this.octaves + 1; // 1 additional key in the 0th octave
+		this.notes = this.getNotes();
+		this.sampler = this.initialiseSampler();
 		
 		this.canvas = document.getElementById(canvasId);
 		this.drawKeyboard();
@@ -117,12 +122,27 @@ class Piano {
 		}
 	}
 	
+	getNotes() {
+		const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+		const octaveNums = [...Array(this.octaves).keys()].map((x) => x + 4 - Math.floor(this.octaves / 2));
+		const allNotes = noteNames.slice(-3).map((n) => n + (octaveNums.at(0) - 1));
+		allNotes.push(...octaveNums.map((o) => noteNames.map((n) => n + o)).flat());
+		allNotes.push(noteNames.at(0) + (octaveNums.at(-1) + 1));
+		return allNotes;
+	}
+	
+	playNote(keyNum) {
+		Tone.start().then(() => {
+			this.sampler.triggerAttackRelease(this.notes[keyNum-1], 0.2);
+		});
+	}
+	
 	keyboardClicked(event) {
 		const canvasRect = this.canvas.getBoundingClientRect();
 		const clickX = event.clientX - canvasRect.left;
 		const clickY = event.clientY - canvasRect.top;
-		const clickedKey = this.getKeyByCoord(clickX, clickY)
-		console.log(clickedKey.keyNum, clickedKey.octave, clickedKey.octaveKeyNum, clickedKey.isWhiteKey);
+		const clickedKey = this.getKeyByCoord(clickX, clickY);
+		this.playNote(clickedKey.keyNum);
 	}
 	
 	mouseMoveKeyboard(event) {
@@ -175,9 +195,25 @@ class Piano {
 			ctx.strokeRect(x, 0, blackKeyWidth, blackKeyHeight);
 		}
 	}
+	
+	initialiseSampler() {
+		const sampleFiles = Object.assign({}, ...this.notes.map((n) => ({[n]: n.replace('#', 's') + ".mp3"})));
+		// No sample files for keys A0, A#0, and B0
+		delete sampleFiles['A0'];
+		delete sampleFiles['A#0']
+		delete sampleFiles['B0']
+		
+		const sampler = new Tone.Sampler({
+			urls: sampleFiles,
+			baseUrl: "assets/samples/piano/",
+			release: 0.5
+		}).toDestination();
+		
+		return sampler;
+	}
 }
 
-const octaves = 5;
+const octaves = 7;
 function initialisePiano() {
 	const piano = new Piano('pianoCanvas', octaves);
 
