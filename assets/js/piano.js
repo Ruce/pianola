@@ -126,6 +126,16 @@ class Piano {
 		}
 	}
 	
+	getXCoordByKey(isWhiteKey, colourKeyNum) {
+		if (isWhiteKey) {
+			return this.whiteKeyWidth * colourKeyNum;
+		} else {
+			const k = (colourKeyNum + 4) % 5; // Index of the 5 black keys in `blackKeyPos`
+			const o = Math.floor((colourKeyNum-1) / 5); // Current octave (first full octave is index 0, unlike PianoKey convention)
+			return this.whiteKeyWidth * (Piano.blackKeyPos[k] + o*7 + 2);
+		}
+	}
+	
 	getNotes() {
 		const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 		const octaveNums = [...Array(this.octaves).keys()].map((x) => x + 4 - Math.floor(this.octaves / 2));
@@ -135,16 +145,19 @@ class Piano {
 		return allNotes;
 	}
 	
-	playNote(keyNum) {
+	playNote(noteKey) {
 		Tone.start().then(() => {
-			this.sampler.triggerAttackRelease(this.notes[keyNum-1], 0.2);
+			this.sampler.triggerAttackRelease(this.notes[noteKey.keyNum-1], 0.2);
 		});
+		if (typeof this.notesCanvas !== 'undefined') {
+			this.notesCanvas.addNote(noteKey);
+		}
 	}
 	
 	keyboardClicked(event) {
 		globalMouseDown = true;
 		const clickedKey = this.getKeyByCoord(event.clientX, event.clientY);
-		this.playNote(clickedKey.keyNum);
+		this.playNote(clickedKey);
 	}
 	
 	mouseMoveKeyboard(event) {
@@ -153,7 +166,7 @@ class Piano {
 			// Newly moused over key
 			this.drawKeyboard(hoverKey);
 			if (globalMouseDown) {
-				this.playNote(hoverKey.keyNum);
+				this.playNote(hoverKey);
 			}
 			this.prevHoverKey = hoverKey;
 		}
@@ -183,7 +196,7 @@ class Piano {
 			if (hoverKeyDefined && hoverKey.isWhiteKey && hoverKey.colourKeyNum === i) {
 				ctx.fillStyle = Piano.keyFill.white.active;
 			}
-			const x = i * whiteKeyWidth;
+			const x = this.getXCoordByKey(true, i);
 			ctx.fillRect(x, 0, whiteKeyWidth, whiteKeyHeight);
 			ctx.strokeRect(x, 0, whiteKeyWidth, whiteKeyHeight);
 		}
@@ -193,10 +206,7 @@ class Piano {
 			if (hoverKeyDefined && !hoverKey.isWhiteKey && hoverKey.colourKeyNum === i) {
 				ctx.fillStyle = Piano.keyFill.black.active;
 			}
-			
-			const k = (i+4) % 5; // Index of the 5 black keys in `blackKeyPos`
-			const o = Math.floor((i-1) / 5); // Current octave
-			const x = whiteKeyWidth * (Piano.blackKeyPos[k] + o*7 + 2);
+			const x = this.getXCoordByKey(false, i);
 			ctx.fillRect(x, 0, blackKeyWidth, blackKeyHeight);
 			ctx.strokeRect(x, 0, blackKeyWidth, blackKeyHeight);
 		}
@@ -216,5 +226,9 @@ class Piano {
 		}).toDestination();
 		
 		return sampler;
+	}
+	
+	bindNotesCanvas(notesCanvas) {
+		this.notesCanvas = notesCanvas;
 	}
 }
