@@ -25,7 +25,7 @@ class PianoKey {
 }
 
 class Piano {
-	constructor(canvasId, octaves) {
+	constructor(canvasId, octaves, model) {
 		if (octaves < 1 || octaves > 7) {
 			throw new RangeError("The number of octaves must be between 1 and 7");
 		}
@@ -34,6 +34,7 @@ class Piano {
 		this.blackKeys = 5 * this.octaves + 1; // 1 additional key in the 0th octave
 		this.notes = this.getNotes();
 		
+		this.model = model;
 		this.sampler = this.initialiseSampler();
 		this.toneStarted = false;
 		this.noteHistory = [];
@@ -45,6 +46,7 @@ class Piano {
 		this.canvas.addEventListener('mouseout', this.mouseOutKeyboard.bind(this));
 		
 		this.prevHoverKey = null;
+		
 	}
 	
 	static get keyboardRatio() {
@@ -153,6 +155,7 @@ class Piano {
 			Tone.Transport.start();
 		});
 		this.toneStarted = true;
+		setInterval(() => this.callModel(), 2000);
 	}
 	
 	playNote(noteKey, time) {
@@ -176,6 +179,31 @@ class Piano {
 	
 	scheduleNote(noteKey, triggerTime) {
 		Tone.Transport.scheduleOnce((time) => this.playNote(noteKey, time), triggerTime);
+	}
+	
+	callModel() {
+		const start = typeof this.prevCallEnd === 'undefined' ? 0 : this.prevCallEnd;
+		const end = Tone.Transport.position;
+		const recentHistory = this.getRecentHistory(this.noteHistory, start);
+		const generated = this.model.generateNotes(recentHistory, start, end, Tone.Time("1m"));
+		for (const g of generated) {
+			//this.scheduleNote(g.note, g.position);
+		}
+		
+		this.prevCallEnd = end;
+	}
+	
+	getRecentHistory(history, start) {
+		const recentHistory = [];
+		for (let i = history.length - 1; i >= 0; i--) {
+			const h = history[i];
+			if (Tone.Time(h.position).toTicks() >= Tone.Time(start).toTicks()) {
+				recentHistory.push(h);
+			} else {
+				break;
+			}
+		}
+		return recentHistory;
 	}
 	
 	keyboardClicked(event) {

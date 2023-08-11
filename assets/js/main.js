@@ -1,7 +1,9 @@
 ---
 ---
+{% include_relative model.js %}
 {% include_relative piano.js %}
 {% include_relative notes.js %}
+
 
 const octaves = 5;
 
@@ -10,7 +12,8 @@ var notesCanvas;
 var globalMouseDown = false;
 
 function initialiseCanvases() {
-	piano = new Piano('pianoCanvas', octaves);
+	model = new PianolaModel();
+	piano = new Piano('pianoCanvas', octaves, model);
 	notesCanvas = new NotesCanvas('notesCanvas', piano);
 }
 
