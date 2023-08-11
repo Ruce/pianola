@@ -1,19 +1,39 @@
+class Note {
+	constructor(noteKey, position) {
+		this.noteKey = noteKey;
+		this.position = position;
+	}
+	
+	static getRecentHistory(history, start) {
+		const recentHistory = [];
+		for (let i = history.length - 1; i >= 0; i--) {
+			const h = history[i];
+			if (Tone.Time(h.position).toTicks() >= Tone.Time(start).toTicks()) {
+				recentHistory.push(h);
+			} else {
+				break;
+			}
+		}
+		return recentHistory;
+	}
+}
+
 class NotesCanvas {
 	constructor(canvasId, piano) {
 		this.piano = piano;
 		this.piano.bindNotesCanvas(this);
 		
 		this.canvas = document.getElementById(canvasId);
-		this.activeNotes = [];
+		this.activeBars = [];
 		
 		this.animationActive = false;
 		this.triggerAnimation();
 	}
 	
-	addNote(noteKey, currTime) {
+	addNoteBar(noteKey, currTime) {
 		const x = this.piano.getXCoordByKey(noteKey.isWhiteKey, noteKey.colourKeyNum);
 		const noteWidth = noteKey.isWhiteKey ? this.piano.whiteKeyWidth : this.piano.blackKeyWidth;
-		this.activeNotes.push({startTime: currTime, x: x, width: noteWidth});
+		this.activeBars.push({startTime: currTime, x: x, width: noteWidth});
 		this.triggerAnimation();
 	}
 	
@@ -36,21 +56,21 @@ class NotesCanvas {
 		//ctx.fillRect(0, new Date().getMilliseconds() / 10, 10, 10);
 		
 		ctx.fillStyle = 'yellow';
-		if (this.activeNotes.length > 0) {
-			const newActiveNotes = [];
+		if (this.activeBars.length > 0) {
+			const newActiveBars = [];
 			const currTime = new Date();
-			for (const n of this.activeNotes) {
+			for (const n of this.activeBars) {
 				const rectY = this.canvas.height - ((currTime - n.startTime) * this.canvas.height / 4000);
 				const rectHeight = this.canvas.height / 30;
 				ctx.fillRect(n.x, rectY, n.width, rectHeight);
 				
 				if (rectY + rectHeight > 0) {
-					newActiveNotes.push(n);
+					newActiveBars.push(n);
 				}
 			}
-			this.activeNotes = newActiveNotes;	
+			this.activeBars = newActiveBars;	
 		}
 		this.animationActive = false;
-		if (this.activeNotes.length > 0) { this.triggerAnimation(); }
+		if (this.activeBars.length > 0) { this.triggerAnimation(); }
 	}
 }

@@ -32,7 +32,7 @@ class Piano {
 		this.octaves = octaves;
 		this.whiteKeys = 7 * this.octaves + 3; // 3 additional keys before and after main octaves
 		this.blackKeys = 5 * this.octaves + 1; // 1 additional key in the 0th octave
-		this.notes = this.getNotes();
+		this.noteKeys = this.getNoteKeys();
 		
 		this.model = model;
 		this.sampler = this.initialiseSampler();
@@ -141,7 +141,7 @@ class Piano {
 		}
 	}
 	
-	getNotes() {
+	getNoteKeys() {
 		const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 		const octaveNums = [...Array(this.octaves).keys()].map((x) => x + 4 - Math.floor(this.octaves / 2));
 		const allNotes = noteNames.slice(-3).map((n) => n + (octaveNums.at(0) - 1));
@@ -162,16 +162,16 @@ class Piano {
 		const currTransportPosition = Tone.Transport.position;
 		const currTime = new Date();
 		
-		this.sampler.triggerAttackRelease(this.notes[noteKey.keyNum-1], 0.2, time);
-		this.noteHistory.push({note: noteKey, position: currTransportPosition});
+		this.sampler.triggerAttackRelease(this.noteKeys[noteKey.keyNum-1], 0.2, time);
+		this.noteHistory.push(new Note(noteKey, currTransportPosition));
 		
 		// Draw note on canvas
 		if (typeof this.notesCanvas !== 'undefined') {
 			if (typeof time !== 'undefined') {
 				// Note was triggered using Transport, so schedule drawing using Tone.Draw callback
-				Tone.Draw.schedule(() => this.notesCanvas.addNote(noteKey, currTime), time);
+				Tone.Draw.schedule(() => this.notesCanvas.addNoteBar(noteKey, currTime), time);
 			} else {
-				this.notesCanvas.addNote(noteKey, currTime);
+				this.notesCanvas.addNoteBar(noteKey, currTime);
 			}
 		}
 		return currTransportPosition;
@@ -184,26 +184,13 @@ class Piano {
 	callModel() {
 		const start = typeof this.prevCallEnd === 'undefined' ? 0 : this.prevCallEnd;
 		const end = Tone.Transport.position;
-		const recentHistory = this.getRecentHistory(this.noteHistory, start);
+		const recentHistory = Note.getRecentHistory(this.noteHistory, start);
 		const generated = this.model.generateNotes(recentHistory, start, end, Tone.Time("1m"));
 		for (const g of generated) {
-			//this.scheduleNote(g.note, g.position);
+			//this.scheduleNote(g.noteKey, g.position);
 		}
 		
 		this.prevCallEnd = end;
-	}
-	
-	getRecentHistory(history, start) {
-		const recentHistory = [];
-		for (let i = history.length - 1; i >= 0; i--) {
-			const h = history[i];
-			if (Tone.Time(h.position).toTicks() >= Tone.Time(start).toTicks()) {
-				recentHistory.push(h);
-			} else {
-				break;
-			}
-		}
-		return recentHistory;
 	}
 	
 	keyboardClicked(event) {
@@ -212,9 +199,6 @@ class Piano {
 		globalMouseDown = true;
 		const clickedKey = this.getKeyByCoord(event.clientX, event.clientY);
 		const transportPosition = this.playNote(clickedKey);
-		
-		//const triggerTime = (Tone.Time(transportPosition).toTicks() + Tone.Time("1m").toTicks()) + "i";
-		//this.scheduleNote(clickedKey, triggerTime);
 	}
 	
 	mouseMoveKeyboard(event) {
@@ -270,7 +254,7 @@ class Piano {
 	}
 	
 	initialiseSampler() {
-		const sampleFiles = Object.assign({}, ...this.notes.map((n) => ({[n]: n.replace('#', 's') + ".mp3"})));
+		const sampleFiles = Object.assign({}, ...this.noteKeys.map((n) => ({[n]: n.replace('#', 's') + ".mp3"})));
 		// No sample files for keys A0, A#0, and B0
 		delete sampleFiles['A0'];
 		delete sampleFiles['A#0']

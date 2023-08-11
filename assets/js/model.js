@@ -6,7 +6,7 @@ class PianolaModel {
 	generateNotes(prevHistory, start, end, buffer) {
 		/*
 		Arguments:
-			`prevHistory`: an array containing recent history of notes that were played
+			`prevHistory`: an array containing recent history of Notes that were played
 			`start`: the TransportTime (in BarsQuartersSixteenths) for the start of history period
 			`end`: the TransportTime (in BarsQuartersSixteenths) for the end of history period
 			`buffer`: the buffer duration (Tone.Time) to add to end of history period
@@ -21,8 +21,8 @@ class PianolaModel {
 		for (const n of prevHistory) {
 			const nTick = Tone.Time(n.position).toTicks();
 			const genPosition =  (endTick + bufferTick + (nTick - startTick)) + "i";
-			const genNote = n.note;
-			generated.push({position: genPosition, note: genNote});
+			const genNote = n.noteKey;
+			generated.push(new Note(genNote, genPosition));
 		}
 		
 		this.noteHistory.push(...generated);
