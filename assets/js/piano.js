@@ -155,15 +155,14 @@ class Piano {
 			Tone.Transport.start();
 		});
 		this.toneStarted = true;
-		setInterval(() => this.callModel(), 2000);
+		setInterval(() => this.callModel(), 1000);
 	}
 	
-	playNote(noteKey, time) {
-		const currTransportPosition = Tone.Transport.position;
+	playNote(noteKey, time, transportPosition=Tone.Transport.position) {
 		const currTime = new Date();
 		
 		this.sampler.triggerAttackRelease(this.noteKeys[noteKey.keyNum-1], 0.2, time);
-		this.noteHistory.push(new Note(noteKey, currTransportPosition));
+		this.noteHistory.push(new Note(noteKey, transportPosition));
 		
 		// Draw note on canvas
 		if (typeof this.notesCanvas !== 'undefined') {
@@ -174,18 +173,18 @@ class Piano {
 				this.notesCanvas.addNoteBar(noteKey, currTime);
 			}
 		}
-		return currTransportPosition;
+		return transportPosition;
 	}
 	
 	scheduleNote(noteKey, triggerTime) {
-		Tone.Transport.scheduleOnce((time) => this.playNote(noteKey, time), triggerTime);
+		Tone.Transport.scheduleOnce((time) => this.playNote(noteKey, time, triggerTime), triggerTime);
 	}
 	
 	callModel() {
 		const start = typeof this.prevCallEnd === 'undefined' ? 0 : this.prevCallEnd;
 		const end = Tone.Transport.position;
 		const recentHistory = Note.getRecentHistory(this.noteHistory, start);
-		const generated = this.model.generateNotes(recentHistory, start, end, Tone.Time("1m"));
+		const generated = this.model.generateNotes(recentHistory, start, end, Tone.Time("4n"));
 		for (const g of generated) {
 			//this.scheduleNote(g.noteKey, g.position);
 		}
@@ -198,7 +197,7 @@ class Piano {
 		
 		globalMouseDown = true;
 		const clickedKey = this.getKeyByCoord(event.clientX, event.clientY);
-		const transportPosition = this.playNote(clickedKey);
+		this.playNote(clickedKey);
 	}
 	
 	mouseMoveKeyboard(event) {

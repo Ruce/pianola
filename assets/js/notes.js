@@ -9,7 +9,7 @@ class Note {
 		for (let i = history.length - 1; i >= 0; i--) {
 			const h = history[i];
 			if (Tone.Time(h.position).toTicks() >= Tone.Time(start).toTicks()) {
-				recentHistory.push(h);
+				recentHistory.unshift(h);
 			} else {
 				break;
 			}
