@@ -5,21 +5,26 @@ class NotesCanvas {
 		
 		this.canvas = document.getElementById(canvasId);
 		this.activeNotes = [];
+		
+		this.animationActive = false;
 		this.triggerAnimation();
 	}
 	
-	addNote(noteKey) {
+	addNote(noteKey, currTime) {
 		const x = this.piano.getXCoordByKey(noteKey.isWhiteKey, noteKey.colourKeyNum);
 		const noteWidth = noteKey.isWhiteKey ? this.piano.whiteKeyWidth : this.piano.blackKeyWidth;
-		this.activeNotes.push({startTime: new Date(), x: x, width: noteWidth});
+		this.activeNotes.push({startTime: currTime, x: x, width: noteWidth});
 		this.triggerAnimation();
 	}
 	
 	triggerAnimation() {
-		window.requestAnimationFrame(() => this.draw());
+		if (!this.animationActive) {
+			window.requestAnimationFrame(() => this.draw());
+		}
 	}
 	
 	draw() {
+		this.animationActive = true;
 		const ctx = this.canvas.getContext('2d');
 		this.canvas.width = window.innerWidth;
 		this.canvas.height = window.innerHeight - piano.canvas.height;
@@ -43,9 +48,9 @@ class NotesCanvas {
 					newActiveNotes.push(n);
 				}
 			}
-			this.activeNotes = newActiveNotes;
-			this.triggerAnimation();
+			this.activeNotes = newActiveNotes;	
 		}
-		
+		this.animationActive = false;
+		if (this.activeNotes.length > 0) { this.triggerAnimation(); }
 	}
 }

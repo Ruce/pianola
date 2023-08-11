@@ -33,7 +33,10 @@ class Piano {
 		this.whiteKeys = 7 * this.octaves + 3; // 3 additional keys before and after main octaves
 		this.blackKeys = 5 * this.octaves + 1; // 1 additional key in the 0th octave
 		this.notes = this.getNotes();
+		
 		this.sampler = this.initialiseSampler();
+		this.toneStarted = false;
+		this.noteHistory = [];
 		
 		this.canvas = document.getElementById(canvasId);
 		this.drawKeyboard();
@@ -145,19 +148,45 @@ class Piano {
 		return allNotes;
 	}
 	
-	playNote(noteKey) {
+	startTone() {
 		Tone.start().then(() => {
-			this.sampler.triggerAttackRelease(this.notes[noteKey.keyNum-1], 0.2);
+			Tone.Transport.start();
 		});
+		this.toneStarted = true;
+	}
+	
+	playNote(noteKey, time) {
+		const currTransportPosition = Tone.Transport.position;
+		const currTime = new Date();
+		
+		this.sampler.triggerAttackRelease(this.notes[noteKey.keyNum-1], 0.2, time);
+		this.noteHistory.push({note: noteKey, position: currTransportPosition});
+		
+		// Draw note on canvas
 		if (typeof this.notesCanvas !== 'undefined') {
-			this.notesCanvas.addNote(noteKey);
+			if (typeof time !== 'undefined') {
+				// Note was triggered using Transport, so schedule drawing using Tone.Draw callback
+				Tone.Draw.schedule(() => this.notesCanvas.addNote(noteKey, currTime), time);
+			} else {
+				this.notesCanvas.addNote(noteKey, currTime);
+			}
 		}
+		return currTransportPosition;
+	}
+	
+	scheduleNote(noteKey, triggerTime) {
+		Tone.Transport.scheduleOnce((time) => this.playNote(noteKey, time), triggerTime);
 	}
 	
 	keyboardClicked(event) {
+		if (!this.toneStarted) { this.startTone(); }
+		
 		globalMouseDown = true;
 		const clickedKey = this.getKeyByCoord(event.clientX, event.clientY);
-		this.playNote(clickedKey);
+		const transportPosition = this.playNote(clickedKey);
+		
+		//const triggerTime = (Tone.Time(transportPosition).toTicks() + Tone.Time("1m").toTicks()) + "i";
+		//this.scheduleNote(clickedKey, triggerTime);
 	}
 	
 	mouseMoveKeyboard(event) {
