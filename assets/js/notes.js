@@ -32,8 +32,7 @@ class NotesCanvas {
 	
 	addNoteBar(noteKey, currTime) {
 		const x = this.piano.getXCoordByKey(noteKey.isWhiteKey, noteKey.colourKeyNum);
-		const noteWidth = noteKey.isWhiteKey ? this.piano.whiteKeyWidth : this.piano.blackKeyWidth;
-		this.activeBars.push({startTime: currTime, x: x, width: noteWidth});
+		this.activeBars.push({startTime: currTime, x: x, isWhiteKey: noteKey.isWhiteKey});
 		this.triggerAnimation();
 	}
 	
@@ -55,14 +54,21 @@ class NotesCanvas {
 		//ctx.fillStyle = 'red';
 		//ctx.fillRect(0, new Date().getMilliseconds() / 10, 10, 10);
 		
-		ctx.fillStyle = 'yellow';
+		ctx.shadowBlur = 10;
 		if (this.activeBars.length > 0) {
 			const newActiveBars = [];
 			const currTime = new Date();
 			for (const n of this.activeBars) {
 				const rectY = this.canvas.height - ((currTime - n.startTime) * this.canvas.height / 4000);
-				const rectHeight = this.canvas.height / 30;
-				ctx.fillRect(n.x, rectY, n.width, rectHeight);
+				const rectHeight = this.canvas.height / 25;
+				const noteWidth = n.isWhiteKey ? this.piano.whiteKeyWidth : this.piano.blackKeyWidth;
+				
+				ctx.fillStyle = n.isWhiteKey ? '#FDFD66' : '#FFDF00';
+				ctx.shadowColor = 'yellow';
+				//ctx.fillRect(n.x, rectY, n.width, rectHeight);
+				ctx.beginPath();
+				ctx.roundRect(n.x, rectY, noteWidth, rectHeight, 3);
+				ctx.fill();
 				
 				if (rectY + rectHeight > 0) {
 					newActiveBars.push(n);
