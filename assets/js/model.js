@@ -4,6 +4,32 @@ class PianolaModel {
 		this.noteHistory = []; // Array tracking the history of generated notes (ordered from earliest to most recent)
 	}
 	
+	static parseNotes(data, basePositionTick) {
+		const generated = [];
+		const notesSlices = data.split(';');
+		for (let i=0; i < notesSlices.length; i++) {
+			let s = notesSlices[i];
+			if (s.length > 0) {
+				const genPosition = (basePositionTick + i*48) + "i";
+				const notes = s.split(',');
+				for (const n of notes) {
+					const genNote = Piano.getNoteKeyByNum(parseInt(n) + 1)
+					generated.push(new Note(genNote, genPosition));
+				}
+			}
+		}
+		return generated;
+	}
+	
+	static historyToQueryString(history, start, end) {
+		var queryString = '';
+		for (const n of history) {
+			//n.position
+			queryString += (n.noteKey.keyNum - 1) + ';;';
+		}
+		return queryString;
+	}
+	
 	async generateNotes(prevHistory, start, end, buffer) {
 		/*
 		Arguments:
@@ -17,24 +43,12 @@ class PianolaModel {
 		const startTick = Tone.Time(start).toTicks();
 		const endTick = Tone.Time(end).toTicks();
 		const bufferTick = buffer.toTicks();
-		const generated = [];
 		
-		const response = await fetch(this.endpoint);
+		const queryString = PianolaModel.historyToQueryString(prevHistory);
+		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString});
+		const response = await fetch(endpointURI);
 		const data = await response.json();
-		
-		const notesSlices = data.split(';');
-		for (let i=0; i < notesSlices.length; i++) {
-			let s = notesSlices[i];
-			if (s.length > 0) {
-				const genPosition = (endTick + bufferTick + i*48) + "i";
-				const notes = s.split(',');
-				for (const n of notes) {
-					const genNote = Piano.getNoteKeyByNum(parseInt(n) + 1)
-					generated.push(new Note(genNote, genPosition));
-				}
-			}
-		}
-			
+		const generated = PianolaModel.parseNotes(data, endTick + bufferTick);
 		
 		this.noteHistory.push(...generated);
 		return generated;

@@ -65,7 +65,7 @@ class NotesCanvas {
 				
 				ctx.fillStyle = n.isWhiteKey ? '#FDFD66' : '#FFDF00';
 				ctx.shadowColor = 'yellow';
-				//ctx.fillRect(n.x, rectY, n.width, rectHeight);
+				//ctx.fillRect(n.x, rectY, noteWidth, rectHeight);
 				ctx.beginPath();
 				ctx.roundRect(n.x, rectY, noteWidth, rectHeight, 3);
 				ctx.fill();

@@ -376,8 +376,9 @@ def notes_str_to_tensor(notes_str, num_notes):
     notes_tensor = torch.zeros((num_notes, len(notes_slices)))
 
     for t, active_notes_str in enumerate(notes_slices):
-        active_notes = [int(n) for n in active_notes_str.split(NOTES_DELIMITER)]
-        notes_tensor[active_notes, t] = 1
+        if len(active_notes_str) != 0:
+            active_notes = [int(n) for n in active_notes_str.split(NOTES_DELIMITER)]
+            notes_tensor[active_notes, t] = 1
     return notes_tensor
   
 def decode_tensor(y_hat, max_notes):
