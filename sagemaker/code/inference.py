@@ -278,7 +278,7 @@ class MPNNLayer(MessagePassing):
         return (f'{self.__class__.__name__}(emb_dim={self.emb_dim}, aggr={self.aggr})')
 
 class MPNNModel(nn.Module):
-    def __init__(self, edge_index, edge_attr, in_dim, num_layers=2, emb_dim=4, out_dim=1):
+    def __init__(self, edge_index, edge_attr, in_dim, num_layers, emb_dim, out_dim=1):
         """Message Passing Neural Network model for graph property prediction
 
         Args:
@@ -326,17 +326,95 @@ class MPNNModel(nn.Module):
         out = self.lin_pred2(h)
         return out.squeeze(-1)
 
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+NUM_NOTES = 64
+WINDOW_SIZE = 48
+NEIGHBOUR_DISTANCES = [-7, -4, -3, 3, 4, 7]
+NOTES_DELIMITER = ','
+TICKS_DELIMITER = ';'
+
+def create_tonnetz_adjacency_matrix(num_notes):
+    # In Tonnetz, each node has six neighbours which have pitches of the following distances (in semi-tones)
+    # E.g. C4 has neighbours F3, G#3, A3, D#4, E4, G4
+    A = []
+    for i in range(num_notes):
+        row = torch.zeros(num_notes, dtype=torch.int)
+        for d in NEIGHBOUR_DISTANCES:
+            j = i+d
+            if j >= 0 and j < num_notes:
+                row[j] = 1
+        A.append(row)
+    A = torch.stack(A)
+    # Check that A is symmetric since the Tonnetz graph is undirected
+    assert(torch.equal(A, A.transpose(0, 1)))
+
+    # Convert to sparse format expected by PyG layers
+    edge_index = A.to_sparse().indices().to(device)
+    return edge_index
+
+def create_tonnetz_edge_attr(edge_index):
+    edge_attr_indices = []
+    for i in range(edge_index.shape[1]):
+        distance = (edge_index[1][i] - edge_index[0][i]).item()
+        edge_attr_indices.append(NEIGHBOUR_DISTANCES.index(distance))
+
+    edge_attr = F.one_hot(torch.tensor(edge_attr_indices)).to(device)
+    return edge_attr
+
+def notes_tensor_to_str(notes_tensor):
+    ticks = notes_tensor.shape[1]
+
+    notes_list = []
+    for t in range(ticks):
+        active_notes_in_slice = torch.nonzero(notes_tensor[:, t], as_tuple=True)[0]
+        notes_list.append(NOTES_DELIMITER.join([str(n) for n in active_notes_in_slice.tolist()])) # Convert tensor to list to string
+    return TICKS_DELIMITER.join(notes_list)
+
+def notes_str_to_tensor(notes_str, num_notes):
+    notes_slices = notes_str.split(TICKS_DELIMITER)
+    notes_tensor = torch.zeros((num_notes, len(notes_slices)))
+
+    for t, active_notes_str in enumerate(notes_slices):
+        active_notes = [int(n) for n in active_notes_str.split(NOTES_DELIMITER)]
+        notes_tensor[active_notes, t] = 1
+    return notes_tensor
+  
+def decode_tensor(y_hat, max_notes):
+    assert len(y_hat.shape) == 1
+    sample = torch.bernoulli(y_hat)
+    if torch.count_nonzero(sample) > max_notes:
+        sample_prob = y_hat * sample
+        to_keep = torch.argsort(sample_prob, descending=True)[:max_notes]
+        sample = torch.zeros(y_hat.shape)
+        sample[to_keep] = 1
+    return sample
+
+def generate_music(model, seed, timesteps, max_notes=6):
+    generated = seed
+    window_size = seed.shape[1]
+
+    model.eval()
+    with torch.no_grad():
+        for i in range(timesteps):
+            if i == 0:
+                pred = model(seed)
+            else:
+                pred = model(generated[:, -window_size:])
+
+            y_hat = torch.sigmoid(pred)
+            new_notes = decode_tensor(y_hat, max_notes)
+            generated = torch.cat((generated, new_notes.unsqueeze(1)), dim=1)
+    return generated[:, -timesteps:]
+
 
 # defining model and loading weights to it.
 def model_fn(model_dir):
-    edge_index = torch.tensor([[0, 1], [1, 0]]).to_sparse().indices().to(device)
-    edge_attr = torch.tensor([[0, 1], [0, 1]])
-
-    model = MPNNModel(edge_index, edge_attr, in_dim=2, num_layers=2, emb_dim=4, out_dim=1)
+    edge_index = create_tonnetz_adjacency_matrix(NUM_NOTES)
+    edge_attr = create_tonnetz_edge_attr(edge_index)
+    model = MPNNModel(edge_index, edge_attr, in_dim=WINDOW_SIZE, num_layers=4, emb_dim=48, out_dim=1)
     with open(os.path.join(model_dir, "model.pth"), "rb") as f:
-        model.load_state_dict(torch.load(f))
+        model.load_state_dict(torch.load(f, map_location=torch.device('cpu')))
     model.to(device).eval()
     return model
 
@@ -344,20 +422,22 @@ def model_fn(model_dir):
 # data preprocessing
 def input_fn(request_body, request_content_type):
     assert request_content_type == "application/json"
-    data = json.loads(request_body)["inputs"]
-    data = torch.tensor(data, dtype=torch.float32, device=device)
+    notes_str = json.loads(request_body)["inputs"]
+    data = notes_str_to_tensor(notes_str, num_notes=NUM_NOTES)
     return data
 
 
 # inference
 def predict_fn(input_object, model):
-    with torch.no_grad():
-        prediction = model(input_object)
+    timesteps = 16
+    # Pad or trim input_object tensor to the correct WINDOW_SIZE
+    seed = torch.cat((torch.zeros((NUM_NOTES, WINDOW_SIZE)), input_object), dim=1)[:, -WINDOW_SIZE:]
+    prediction = generate_music(model, seed, timesteps)
     return prediction
 
 
 # postprocess
 def output_fn(predictions, content_type):
     assert content_type == "application/json"
-    res = predictions.cpu().numpy().tolist()
+    res = notes_tensor_to_str(predictions)
     return json.dumps(res)
