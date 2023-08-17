@@ -12,7 +12,7 @@ var notesCanvas;
 var globalMouseDown = false;
 
 function initialiseCanvases() {
-	model = new PianolaModel();
+	model = new PianolaModel('https://vcnf5f6zo2.execute-api.eu-west-2.amazonaws.com/beta/next-notes?notes=27;;29;;31;;29;;27');
 	piano = new Piano('pianoCanvas', octaves, model);
 	notesCanvas = new NotesCanvas('notesCanvas', piano);
 }
@@ -29,6 +29,5 @@ var resizeTimeout = false;
 const resizeDelay = 40;
 window.onresize = function () {
 	clearTimeout(resizeTimeout);
-	//resizeTimeout = setTimeout(piano.drawKeyboard.bind(piano), resizeDelay);
 	resizeTimeout = setTimeout(redrawCanvases, resizeDelay);
 }

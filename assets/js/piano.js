@@ -32,7 +32,7 @@ class Piano {
 		this.octaves = octaves;
 		this.whiteKeys = 7 * this.octaves + 3; // 3 additional keys before and after main octaves
 		this.blackKeys = 5 * this.octaves + 1; // 1 additional key in the 0th octave
-		this.noteKeys = this.getNoteKeys();
+		this.noteKeys = this.getAllNoteKeys();
 		
 		this.model = model;
 		this.sampler = this.initialiseSampler();
@@ -89,6 +89,18 @@ class Piano {
 		];
 	}
 	
+	static getNoteKeyByNum(keyNum) {
+		/*
+		`keyNum`: 1-indexed absolute number of key on the keyboard, starting from lowest note = 1
+		`octave`: the octave that this key belongs in, with the first 3 keys being in octave 0
+		`octaveKeyNum`: the key's relative key number (1-indexed) in its octave, e.g. C = 1
+		`isWhiteKey`: Boolean for whether the key is white or black */
+		const octave = Math.floor((keyNum + (9-1)) / 12);
+		const octaveKeyNum = ((keyNum + (9-1)) % 12) + 1;
+		const isWhiteKey = Piano.whiteKeyNumbers.includes(octaveKeyNum);
+		return new PianoKey(keyNum, octave, octaveKeyNum, isWhiteKey);
+	}
+	
 	getKeyByCoord(clientX, clientY) {
 		const canvasRect = this.canvas.getBoundingClientRect();
 		const x = clientX - canvasRect.left;
@@ -141,7 +153,8 @@ class Piano {
 		}
 	}
 	
-	getNoteKeys() {
+	
+	getAllNoteKeys() {
 		const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 		const octaveNums = [...Array(this.octaves).keys()].map((x) => x + 4 - Math.floor(this.octaves / 2));
 		const allNotes = noteNames.slice(-3).map((n) => n + (octaveNums.at(0) - 1));
@@ -155,7 +168,7 @@ class Piano {
 			Tone.Transport.start();
 		});
 		this.toneStarted = true;
-		setInterval(() => this.callModel(), 1000);
+		setInterval(() => this.callModel(), 2000);
 	}
 	
 	playNote(noteKey, time, transportPosition=Tone.Transport.position) {
@@ -180,13 +193,13 @@ class Piano {
 		Tone.Transport.scheduleOnce((time) => this.playNote(noteKey, time, triggerTime), triggerTime);
 	}
 	
-	callModel() {
+	async callModel() {
 		const start = typeof this.prevCallEnd === 'undefined' ? 0 : this.prevCallEnd;
 		const end = Tone.Transport.position;
 		const recentHistory = Note.getRecentHistory(this.noteHistory, start);
-		const generated = this.model.generateNotes(recentHistory, start, end, Tone.Time("4n"));
+		const generated = await this.model.generateNotes(recentHistory, start, end, Tone.Time("4n"));
 		for (const g of generated) {
-			//this.scheduleNote(g.noteKey, g.position);
+			this.scheduleNote(g.noteKey, g.position);
 		}
 		
 		this.prevCallEnd = end;
