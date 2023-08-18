@@ -37,6 +37,7 @@ class Piano {
 		this.model = model;
 		this.sampler = this.initialiseSampler();
 		this.toneStarted = false;
+		this.isCallingModel = false;
 		this.noteHistory = [];
 		
 		this.canvas = document.getElementById(canvasId);
@@ -168,7 +169,6 @@ class Piano {
 			Tone.Transport.start();
 		});
 		this.toneStarted = true;
-		setInterval(() => this.callModel(), 2000);
 	}
 	
 	playNote(noteKey, time, transportPosition=Tone.Transport.position) {
@@ -195,18 +195,29 @@ class Piano {
 	
 	async callModel() {
 		const start = typeof this.prevCallEnd === 'undefined' ? 0 : this.prevCallEnd;
-		const end = Tone.Transport.position;
+		const end = Tone.Time(Tone.Transport.position).toTicks();
+		this.prevCallEnd = end;
+		
 		const recentHistory = Note.getRecentHistory(this.noteHistory, start);
-		const generated = await this.model.generateNotes(recentHistory, start, end, Tone.Time("4n"));
+		const generated = await this.model.generateNotes(recentHistory, start, end, Tone.Time("4n").toTicks());
 		for (const g of generated) {
 			this.scheduleNote(g.noteKey, g.position);
 		}
-		
-		this.prevCallEnd = end;
+	}
+	
+	stopCallModel() {
+		if (this.isCallingModel && typeof this.callModelIntervalId !== 'undefined') {
+			this.isCallingModel = false;
+			clearInterval(this.callModelIntervalId);
+		}
 	}
 	
 	keyboardClicked(event) {
 		if (!this.toneStarted) { this.startTone(); }
+		if (!this.isCallingModel) {
+			this.isCallingModel = true;
+			this.callModelIntervalId = setInterval(() => this.callModel(), 2000);
+		}
 		
 		globalMouseDown = true;
 		const clickedKey = this.getKeyByCoord(event.clientX, event.clientY);

@@ -24,6 +24,23 @@ canvas {
   vertical-align: top;
 }
 
+#stopMusic {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 2.5%;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0 0 2.5% 0;
+  border-width: 1px;
+  background-color: Maroon;
+  cursor: pointer;
+}
+
+#stopMusic:hover {
+  background-color: red;
+}
+
 /*
 #notesCanvas {
   position: absolute;

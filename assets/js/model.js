@@ -21,12 +21,19 @@ class PianolaModel {
 		return generated;
 	}
 	
-	static historyToQueryString(history, start, end) {
-		var queryString = '';
+	static historyToQueryString(history, startTick, endTick) {
+		const numSixteenthNotes = Math.ceil((endTick - startTick) / 48);
+		const orderedNotes = Array.from({ length: numSixteenthNotes }, () => [])
+		
 		for (const n of history) {
-			//n.position
-			queryString += (n.noteKey.keyNum - 1) + ';;';
+			const p = Tone.Time(n.position).toTicks(); // Position of current note in Ticks
+			if (p <= endTick) {
+				const d = Math.round((p - startTick) / 48); // Delta between note and startTick in SixteenthNotes
+				orderedNotes[d].push(n.noteKey.keyNum - 1);
+			}
 		}
+		
+		const queryString = orderedNotes.map(x => x.join(',')).join(';');
 		return queryString;
 	}
 	
@@ -40,16 +47,17 @@ class PianolaModel {
 		Note: `start` and `end` define the range of time that is provided and do not correspond to events in `prevHistory`
 		*/
 		
-		const startTick = Tone.Time(start).toTicks();
-		const endTick = Tone.Time(end).toTicks();
-		const bufferTick = buffer.toTicks();
-		
-		const queryString = PianolaModel.historyToQueryString(prevHistory);
+		const queryString = PianolaModel.historyToQueryString(prevHistory, start, end);
+		console.log('Query:', queryString);
 		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString});
 		const response = await fetch(endpointURI);
 		const data = await response.json();
-		const generated = PianolaModel.parseNotes(data, endTick + bufferTick);
+		console.log('Data:', data);
 		
+		var generated = [];
+		if (!data.hasOwnProperty('message')) {
+			generated = PianolaModel.parseNotes(data, end + buffer);
+		}
 		this.noteHistory.push(...generated);
 		return generated;
 	}

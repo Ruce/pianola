@@ -4,11 +4,11 @@ class Note {
 		this.position = position;
 	}
 	
-	static getRecentHistory(history, start) {
+	static getRecentHistory(history, startTick) {
 		const recentHistory = [];
 		for (let i = history.length - 1; i >= 0; i--) {
 			const h = history[i];
-			if (Tone.Time(h.position).toTicks() >= Tone.Time(start).toTicks()) {
+			if (Tone.Time(h.position).toTicks() >= startTick) {
 				recentHistory.unshift(h);
 			} else {
 				break;

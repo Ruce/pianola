@@ -22,6 +22,12 @@ function redrawCanvases() {
 	notesCanvas.draw();
 }
 
+function stopMusic() {
+	if (typeof piano !== 'undefind') {
+		piano.stopCallModel();
+	}
+}
+
 document.addEventListener("DOMContentLoaded", initialiseCanvases);
 document.addEventListener("mouseup", () => globalMouseDown = false);
 
