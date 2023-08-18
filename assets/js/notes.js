@@ -30,9 +30,9 @@ class NotesCanvas {
 		this.triggerAnimation();
 	}
 	
-	addNoteBar(noteKey, currTime) {
+	addNoteBar(noteKey, currTime, isPlayedByUser) {
 		const x = this.piano.getXCoordByKey(noteKey.isWhiteKey, noteKey.colourKeyNum);
-		this.activeBars.push({startTime: currTime, x: x, isWhiteKey: noteKey.isWhiteKey});
+		this.activeBars.push({startTime: currTime, x: x, isWhiteKey: noteKey.isWhiteKey, isPlayedByUser: isPlayedByUser});
 		
 		if (!this.animationActive) {
 			this.animationActive = true;
@@ -52,11 +52,10 @@ class NotesCanvas {
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		
 		// Placeholder square to see if animations are fired
-		ctx.fillStyle = 'red';
-		ctx.fillRect(0, new Date().getMilliseconds() / 10, 10, 10);
+		//ctx.fillStyle = 'red';
+		//ctx.fillRect(0, new Date().getMilliseconds() / 10, 10, 10);
 		
 		ctx.shadowBlur = 10;
-		ctx.shadowColor = 'yellow';
 		if (this.activeBars.length > 0) {
 			const newActiveBars = [];
 			const currTime = new Date();
@@ -66,7 +65,13 @@ class NotesCanvas {
 				const rectY = this.canvas.height - ((currTime - n.startTime) * this.canvas.height / 4000);
 				const noteWidth = n.isWhiteKey ? this.piano.whiteKeyWidth : this.piano.blackKeyWidth;
 				
-				ctx.fillStyle = n.isWhiteKey ? '#FDFD66' : '#FFDF00';
+				if (n.isPlayedByUser) {
+					ctx.fillStyle = n.isWhiteKey ? '#FDFD66' : '#FFBF00';
+					ctx.shadowColor = 'yellow';
+				} else {
+					ctx.fillStyle = n.isWhiteKey ? '#BEFCFF' : '#5EBBBF';
+					ctx.shadowColor = '#7DF9FF';
+				}
 				//ctx.fillRect(n.x, rectY, noteWidth, rectHeight);
 				ctx.beginPath();
 				ctx.roundRect(n.x, rectY, noteWidth, rectHeight, 3);

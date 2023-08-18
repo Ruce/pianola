@@ -183,9 +183,9 @@ class Piano {
 		if (typeof this.notesCanvas !== 'undefined') {
 			if (typeof time !== 'undefined') {
 				// Note was triggered using Transport, so schedule drawing using Tone.Draw callback
-				Tone.Draw.schedule(() => this.notesCanvas.addNoteBar(noteKey, currTime), time);
+				Tone.Draw.schedule(() => this.notesCanvas.addNoteBar(noteKey, currTime, false), time);
 			} else {
-				this.notesCanvas.addNoteBar(noteKey, currTime);
+				this.notesCanvas.addNoteBar(noteKey, currTime, true);
 			}
 		}
 		return transportPosition;
