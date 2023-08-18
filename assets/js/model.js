@@ -41,13 +41,17 @@ class PianolaModel {
 		/*
 		Arguments:
 			`prevHistory`: an array containing recent history of Notes that were played
-			`start`: the TransportTime (in BarsQuartersSixteenths) for the start of history period
-			`end`: the TransportTime (in BarsQuartersSixteenths) for the end of history period
-			`buffer`: the buffer duration (Tone.Time) to add to end of history period
+			`start`: the TransportTime (in Ticks) for the start of history period
+			`end`: the TransportTime (in Ticks) for the end of history period
+			`buffer`: the buffer duration (Tone.Time in Ticks) to add to end of history period
 		Note: `start` and `end` define the range of time that is provided and do not correspond to events in `prevHistory`
 		*/
 		
-		const queryString = PianolaModel.historyToQueryString(prevHistory, start, end);
+		// Get "history" from buffer (i.e. notes queued up to be played) and combine with prevHistory (i.e. notes that have been played)
+		const recentNoteHistory = Note.getRecentHistory(this.noteHistory, end);
+		recentNoteHistory.push(...prevHistory);
+		
+		const queryString = PianolaModel.historyToQueryString(recentNoteHistory, start, end+buffer);
 		console.log('Query:', queryString);
 		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString});
 		const response = await fetch(endpointURI);

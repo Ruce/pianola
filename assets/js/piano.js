@@ -165,10 +165,12 @@ class Piano {
 	}
 	
 	startTone() {
-		Tone.start().then(() => {
-			Tone.Transport.start();
-		});
-		this.toneStarted = true;
+		if (!this.toneStarted) { 
+			Tone.start().then(() => {
+				Tone.Transport.start();
+			});
+			this.toneStarted = true;
+		}
 	}
 	
 	playNote(noteKey, time, transportPosition=Tone.Transport.position) {
@@ -194,14 +196,23 @@ class Piano {
 	}
 	
 	async callModel() {
-		const start = typeof this.prevCallEnd === 'undefined' ? 0 : this.prevCallEnd;
+		//const start = typeof this.prevCallEnd === 'undefined' ? 0 : this.prevCallEnd;
 		const end = Tone.Time(Tone.Transport.position).toTicks();
+		const start = Math.max(0, end - Tone.Time('4').toTicks());
 		this.prevCallEnd = end;
 		
 		const recentHistory = Note.getRecentHistory(this.noteHistory, start);
-		const generated = await this.model.generateNotes(recentHistory, start, end, Tone.Time("4n").toTicks());
+		const buffer = Tone.Time("2").toTicks()
+		const generated = await this.model.generateNotes(recentHistory, start, end, buffer);
 		for (const g of generated) {
 			this.scheduleNote(g.noteKey, g.position);
+		}
+	}
+	
+	startCallModel() {
+		if (!this.isCallingModel) {
+			this.isCallingModel = true;
+			this.callModelIntervalId = setInterval(() => this.callModel(), 2000);
 		}
 	}
 	
@@ -213,11 +224,8 @@ class Piano {
 	}
 	
 	keyboardClicked(event) {
-		if (!this.toneStarted) { this.startTone(); }
-		if (!this.isCallingModel) {
-			this.isCallingModel = true;
-			this.callModelIntervalId = setInterval(() => this.callModel(), 2000);
-		}
+		this.startTone();
+		this.startCallModel();
 		
 		globalMouseDown = true;
 		const clickedKey = this.getKeyByCoord(event.clientX, event.clientY);
