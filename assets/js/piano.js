@@ -1,26 +1,59 @@
 class PianoKey {
 	/*
 	Properties
-		`keyNum`: 1-indexed absolute number of key on the keyboard, starting from lowest note = 1
+		`keyNum`: 0-indexed absolute number of key on the keyboard, starting from lowest note = 0
+		`midiNoteNum`: number in range [0, 127] based on the MIDI specification
 		`octave`: the octave that this key belongs in, with the first 3 keys being in octave 0
 		`octaveKeyNum`: the key's relative key number (1-indexed) in its octave, e.g. C = 1
 		`isWhiteKey`: Boolean for whether the key is white or black
 		`colourKeyNum`: 0-indexed key number relative to its colour, e.g. first white key = 0
 	*/
-	constructor(keyNum, octave, octaveKeyNum, isWhiteKey) {
+	constructor(keyNum, midiNoteNum) {
 		this.keyNum = keyNum;
-		this.octave = octave;
-		this.octaveKeyNum = octaveKeyNum;
-		this.isWhiteKey = isWhiteKey;
-		this.colourKeyNum = this.calcColourKeyNum();
+		this.midiNoteNum = midiNoteNum;
+		
+		this.octave = PianoKey.calcOctave(keyNum);
+		this.octaveKeyNum = PianoKey.calcOctaveKeyNum(keyNum);
+		this.isWhiteKey = PianoKey.calcIsWhiteKey(keyNum);
+		this.colourKeyNum = PianoKey.calcColourKeyNum(keyNum);
+		this.keyName = PianoKey.calcKeyName(midiNoteNum);
 	}
 	
-	calcColourKeyNum() {
-		if (this.isWhiteKey) {
-			return Piano.whiteKeyNumbers.indexOf(this.octaveKeyNum) + this.octave*7 - 5;
+	static calcOctave(keyNum) {
+		return Math.floor((keyNum + 9) / 12);
+	}
+	
+	static calcOctaveKeyNum(keyNum) {
+		return ((keyNum + 9) % 12) + 1;
+	}
+	
+	static calcIsWhiteKey(keyNum) {
+		const octaveKeyNum = PianoKey.calcOctaveKeyNum(keyNum);
+		return Piano.whiteKeyNumbers.includes(octaveKeyNum);
+	}
+	
+	static calcColourKeyNum(keyNum) {
+		const octave = PianoKey.calcOctave(keyNum);
+		const octaveKeyNum = PianoKey.calcOctaveKeyNum(keyNum);
+		const isWhiteKey = PianoKey.calcIsWhiteKey(keyNum);
+		if (isWhiteKey) {
+			return Piano.whiteKeyNumbers.indexOf(octaveKeyNum) + (octave * 7) - 5;
 		} else {
-			return Piano.blackKeyNumbers.indexOf(this.octaveKeyNum) + this.octave*5 - 4;
+			return Piano.blackKeyNumbers.indexOf(octaveKeyNum) + (octave * 5) - 4;
 		}
+	}
+	
+	static get midiNoteNumMiddleC() {
+		return 60;
+	}
+	
+	static calcKeyName(midiNoteNum) {
+		const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+		
+		const delta = midiNoteNum - PianoKey.midiNoteNumMiddleC;
+		const pitchOctave = Math.floor(delta / 12) + 4;
+		const index = ((delta % 12) + 12) % 12; // Modulo operation to give non-negative result
+		return noteNames[index] + pitchOctave;
 	}
 }
 
@@ -30,9 +63,9 @@ class Piano {
 			throw new RangeError("The number of octaves must be between 1 and 7");
 		}
 		this.octaves = octaves;
-		this.whiteKeys = 7 * this.octaves + 3; // 3 additional keys before and after main octaves
-		this.blackKeys = 5 * this.octaves + 1; // 1 additional key in the 0th octave
-		this.noteKeys = this.getAllNoteKeys();
+		this.numWhiteKeys = 7 * this.octaves + 3; // 3 additional keys before and after main octaves
+		this.numBlackKeys = 5 * this.octaves + 1; // 1 additional key in the 0th octave
+		this.pianoKeys = Piano.createPianoKeys(this.octaves);
 		
 		this.model = model;
 		this.sampler = this.initialiseSampler();
@@ -47,7 +80,6 @@ class Piano {
 		this.canvas.addEventListener('mouseout', this.mouseOutKeyboard.bind(this));
 		
 		this.prevHoverKey = null;
-		
 	}
 	
 	static get keyboardRatio() {
@@ -90,16 +122,14 @@ class Piano {
 		];
 	}
 	
-	static getNoteKeyByNum(keyNum) {
-		/*
-		`keyNum`: 1-indexed absolute number of key on the keyboard, starting from lowest note = 1
-		`octave`: the octave that this key belongs in, with the first 3 keys being in octave 0
-		`octaveKeyNum`: the key's relative key number (1-indexed) in its octave, e.g. C = 1
-		`isWhiteKey`: Boolean for whether the key is white or black */
-		const octave = Math.floor((keyNum + (9-1)) / 12);
-		const octaveKeyNum = ((keyNum + (9-1)) % 12) + 1;
-		const isWhiteKey = Piano.whiteKeyNumbers.includes(octaveKeyNum);
-		return new PianoKey(keyNum, octave, octaveKeyNum, isWhiteKey);
+	static createPianoKeys(octaves) {
+		const numKeys = (7 * octaves + 3) + (5 * octaves + 1); // White keys + black keys, and extra keys outside of main octaves
+		const lowestMidiNote = PianoKey.midiNoteNumMiddleC - (Math.floor(octaves / 2) * 12) - 3; // Calculate lowest note from middle C
+		const pianoKeys = [];
+		for (let i = 0; i < numKeys; i++) {
+			pianoKeys.push(new PianoKey(i, lowestMidiNote + i));
+		}
+		return pianoKeys;
 	}
 	
 	getKeyByCoord(clientX, clientY) {
@@ -115,11 +145,12 @@ class Piano {
 			// Must be a white key
 			const n = Math.floor(deltaX / this.whiteKeyWidth);
 			const octaveKeyNum = Piano.whiteKeyNumbers[n];
-			const keyNum = octaveKeyNum + o*12 - 9;
-			return new PianoKey(keyNum, o, octaveKeyNum, true);
+			const keyNum = (octaveKeyNum - 1) + o*12 - 9;
+			return this.pianoKeys[keyNum];
 		} else if (o === this.octaves + 1) {
 			// Only highest C is in the highest octave
-			return new PianoKey(o * 12 - 8, o, 1, true);
+			const keyNum = o * 12 - 9;
+			return this.pianoKeys[keyNum];
 		} else {
 			for (let i=0; i < Piano.blackKeyPos.length; i++) {
 				if (o === 0 && i < 4) {
@@ -132,15 +163,15 @@ class Piano {
 				// Except for octave 0, which only has 1 black key
 				if (deltaX >= blackKeyLeft && deltaX <= blackKeyRight) {
 					const octaveKeyNum = Piano.blackKeyNumbers[i];
-					const keyNum = octaveKeyNum + o*12 - 9;
-					return new PianoKey(keyNum, o, octaveKeyNum, false);
+					const keyNum = (octaveKeyNum - 1) + o*12 - 9;
+					return this.pianoKeys[keyNum];
 				}
 			}
 			// Not a black key, therefore must be a white key
 			const n = Math.floor(deltaX / this.whiteKeyWidth);
 			const octaveKeyNum = Piano.whiteKeyNumbers[n];
-			const keyNum = octaveKeyNum + o*12 - 9;
-			return new PianoKey(keyNum, o, octaveKeyNum, true);
+			const keyNum = (octaveKeyNum - 1) + o*12 - 9;
+			return this.pianoKeys[keyNum];
 		}
 	}
 	
@@ -154,16 +185,6 @@ class Piano {
 		}
 	}
 	
-	
-	getAllNoteKeys() {
-		const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-		const octaveNums = [...Array(this.octaves).keys()].map((x) => x + 4 - Math.floor(this.octaves / 2));
-		const allNotes = noteNames.slice(-3).map((n) => n + (octaveNums.at(0) - 1));
-		allNotes.push(...octaveNums.map((o) => noteNames.map((n) => n + o)).flat());
-		allNotes.push(noteNames.at(0) + (octaveNums.at(-1) + 1));
-		return allNotes;
-	}
-	
 	startTone() {
 		if (!this.toneStarted) { 
 			Tone.start().then(() => {
@@ -173,26 +194,26 @@ class Piano {
 		}
 	}
 	
-	playNote(noteKey, time, transportPosition=Tone.Transport.position) {
+	playNote(pianoKey, time, transportPosition=Tone.Transport.position) {
 		const currTime = new Date();
 		
-		this.sampler.triggerAttackRelease(this.noteKeys[noteKey.keyNum-1], 0.2, time);
-		this.noteHistory.push(new Note(noteKey, transportPosition));
+		this.sampler.triggerAttackRelease(pianoKey.keyName, 0.2, time, 0.7);
+		this.noteHistory.push(new Note(pianoKey.keyNum, transportPosition));
 		
 		// Draw note on canvas
 		if (typeof this.notesCanvas !== 'undefined') {
 			if (typeof time !== 'undefined') {
 				// Note was triggered using Transport, so schedule drawing using Tone.Draw callback
-				Tone.Draw.schedule(() => this.notesCanvas.addNoteBar(noteKey, currTime, false), time);
+				Tone.Draw.schedule(() => this.notesCanvas.addNoteBar(pianoKey, currTime, false), time);
 			} else {
-				this.notesCanvas.addNoteBar(noteKey, currTime, true);
+				this.notesCanvas.addNoteBar(pianoKey, currTime, true);
 			}
 		}
 		return transportPosition;
 	}
 	
-	scheduleNote(noteKey, triggerTime) {
-		Tone.Transport.scheduleOnce((time) => this.playNote(noteKey, time, triggerTime), triggerTime);
+	scheduleNote(pianoKey, triggerTime) {
+		Tone.Transport.scheduleOnce((time) => this.playNote(pianoKey, time, triggerTime), triggerTime);
 	}
 	
 	async callModel() {
@@ -207,8 +228,8 @@ class Piano {
 		
 		// Check if the model is still active (i.e. hasn't been stopped) before scheduling notes
 		if (this.isCallingModel) {
-			for (const g of generated) {
-				this.scheduleNote(g.noteKey, g.position);
+			for (const note of generated) {
+				this.scheduleNote(this.pianoKeys[note.keyNum], note.position);
 			}
 		}
 	}
@@ -261,13 +282,13 @@ class Piano {
 		this.canvas.height = this.canvas.width * Piano.keyboardRatio;
 		ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-		this.whiteKeyWidth = this.canvas.width / this.whiteKeys;
+		this.whiteKeyWidth = this.canvas.width / this.numWhiteKeys;
 		this.whiteKeyHeight = this.canvas.height;
 		this.blackKeyWidth = this.whiteKeyWidth * Piano.blackKeyWidthRatio;
 		this.blackKeyHeight = this.whiteKeyHeight * Piano.blackKeyHeightRatio;
 		const [whiteKeyWidth, whiteKeyHeight, blackKeyWidth, blackKeyHeight] = [this.whiteKeyWidth, this.whiteKeyHeight, this.blackKeyWidth, this.blackKeyHeight];
 		
-		for (let i = 0; i < this.whiteKeys; i++) {
+		for (let i = 0; i < this.numWhiteKeys; i++) {
 			ctx.fillStyle = Piano.keyFill.white.inactive;
 			if (hoverKeyDefined && hoverKey.isWhiteKey && hoverKey.colourKeyNum === i) {
 				ctx.fillStyle = Piano.keyFill.white.active;
@@ -277,7 +298,7 @@ class Piano {
 			ctx.strokeRect(x, 0, whiteKeyWidth, whiteKeyHeight);
 		}
 
-		for (let i = 0; i < this.blackKeys; i++) {
+		for (let i = 0; i < this.numBlackKeys; i++) {
 			ctx.fillStyle = Piano.keyFill.black.inactive;
 			if (hoverKeyDefined && !hoverKey.isWhiteKey && hoverKey.colourKeyNum === i) {
 				ctx.fillStyle = Piano.keyFill.black.active;
@@ -289,7 +310,8 @@ class Piano {
 	}
 	
 	initialiseSampler() {
-		const sampleFiles = Object.assign({}, ...this.noteKeys.map((n) => ({[n]: n.replace('#', 's') + ".mp3"})));
+		const noteKeys = this.pianoKeys.map((k) => k.keyName); // Get a list of all notes e.g. ['A3', 'A#3', 'B3', 'C4'...]
+		const sampleFiles = Object.assign({}, ...noteKeys.map((n) => ({[n]: n.replace('#', 's') + ".mp3"})));
 		// No sample files for keys A0, A#0, and B0
 		delete sampleFiles['A0'];
 		delete sampleFiles['A#0']
@@ -298,7 +320,8 @@ class Piano {
 		const sampler = new Tone.Sampler({
 			urls: sampleFiles,
 			baseUrl: "assets/samples/piano/",
-			release: 0.5
+			release: 0.5,
+			volume: -5
 		}).toDestination();
 		
 		return sampler;

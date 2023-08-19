@@ -1,6 +1,6 @@
 class Note {
-	constructor(noteKey, position) {
-		this.noteKey = noteKey;
+	constructor(keyNum, position) {
+		this.keyNum = keyNum;
 		this.position = position;
 	}
 	
@@ -30,9 +30,9 @@ class NotesCanvas {
 		this.triggerAnimation();
 	}
 	
-	addNoteBar(noteKey, currTime, isPlayedByUser) {
-		const x = this.piano.getXCoordByKey(noteKey.isWhiteKey, noteKey.colourKeyNum);
-		this.activeBars.push({startTime: currTime, x: x, isWhiteKey: noteKey.isWhiteKey, isPlayedByUser: isPlayedByUser});
+	addNoteBar(pianoKey, currTime, isPlayedByUser) {
+		const x = this.piano.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
+		this.activeBars.push({startTime: currTime, x: x, isWhiteKey: pianoKey.isWhiteKey, isPlayedByUser: isPlayedByUser});
 		
 		if (!this.animationActive) {
 			this.animationActive = true;

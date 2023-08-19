@@ -14,8 +14,7 @@ class PianolaModel {
 				const genPosition = (basePositionTick + i*48) + "i";
 				const notes = s.split(',');
 				for (const n of notes) {
-					const genNote = Piano.getNoteKeyByNum(parseInt(n) + 1)
-					generated.push(new Note(genNote, genPosition));
+					generated.push(new Note(parseInt(n), genPosition));
 				}
 			}
 		}
@@ -30,7 +29,7 @@ class PianolaModel {
 			const p = Tone.Time(n.position).toTicks(); // Position of current note in Ticks
 			if (p <= endTick) {
 				const d = Math.round((p - startTick) / 48); // Delta between note and startTick in SixteenthNotes
-				orderedNotes[d].push(n.noteKey.keyNum - 1);
+				orderedNotes[d].push(n.keyNum);
 			}
 		}
 		
