@@ -41,14 +41,33 @@ canvas {
   background-color: red;
 }
 
-/*
-#notesCanvas {
+.loaderContainer{
   position: absolute;
-  top: 0;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
 }
 
-#pianoCanvas {
-  position: absolute;
-  bottom: 0;
+.loaderText {
+  display: inline-block;
+  vertical-align: middle;
+  color: #f3f3f3;
+  margin: 0 10px;
 }
-*/
+
+.loader {
+  display: inline-block;
+  border: 7px solid #f3f3f3; /* Light grey */
+  border-top: 7px solid darkgrey;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 2s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

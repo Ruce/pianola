@@ -1,6 +1,7 @@
 class PianolaModel {
 	constructor(endpoint) {
 		this.endpoint = endpoint;
+		this.connectToModel();
 		this.noteHistory = []; // Array tracking the history of generated notes (ordered from earliest to most recent)
 	}
 	
@@ -37,6 +38,29 @@ class PianolaModel {
 		return queryString;
 	}
 	
+	async queryModel(queryString) {
+		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString});
+		const response = await fetch(endpointURI);
+		const data = await response.json();
+		return data;
+	}
+	
+	async connectToModel() {
+		var modelConnected = false;
+		do {
+			const data = await this.queryModel(";");
+			console.log('Data:', data);
+			
+			if (!data.hasOwnProperty('message')) {
+				modelConnected = true;
+				document.getElementById("connectionLoader").style.display = "none";
+			}
+			
+			if (!modelConnected) { setTimeout(500); }
+		} while (!modelConnected);
+		
+	}
+	
 	async generateNotes(prevHistory, start, end, buffer) {
 		/*
 		Arguments:
@@ -53,9 +77,7 @@ class PianolaModel {
 		
 		const queryString = PianolaModel.historyToQueryString(recentNoteHistory, start, end+buffer);
 		console.log('Query:', queryString);
-		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString});
-		const response = await fetch(endpointURI);
-		const data = await response.json();
+		const data = await this.queryModel(queryString);
 		console.log('Data:', data);
 		
 		var generated = [];

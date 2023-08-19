@@ -204,8 +204,12 @@ class Piano {
 		const recentHistory = Note.getRecentHistory(this.noteHistory, start);
 		const buffer = Tone.Time("2").toTicks()
 		const generated = await this.model.generateNotes(recentHistory, start, end, buffer);
-		for (const g of generated) {
-			this.scheduleNote(g.noteKey, g.position);
+		
+		// Check if the model is still active (i.e. hasn't been stopped) before scheduling notes
+		if (this.isCallingModel) {
+			for (const g of generated) {
+				this.scheduleNote(g.noteKey, g.position);
+			}
 		}
 	}
 	
