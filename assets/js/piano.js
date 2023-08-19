@@ -197,7 +197,7 @@ class Piano {
 	playNote(pianoKey, time, transportPosition=Tone.Transport.position) {
 		const currTime = new Date();
 		
-		this.sampler.triggerAttackRelease(pianoKey.keyName, 0.2, time, 0.7);
+		this.sampler.triggerAttackRelease(pianoKey.keyName, 0.25, time);
 		this.noteHistory.push(new Note(pianoKey.keyNum, transportPosition));
 		
 		// Draw note on canvas
@@ -321,7 +321,7 @@ class Piano {
 			urls: sampleFiles,
 			baseUrl: "assets/samples/piano/",
 			release: 0.5,
-			volume: -5
+			volume: -6
 		}).toDestination();
 		
 		return sampler;
