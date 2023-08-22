@@ -151,7 +151,7 @@ class TonnetzUtil():
     assert(torch.equal(A, A.transpose(0, 1)))
 
     # Convert to sparse format expected by PyG layers
-    edge_index = A.to_sparse().indices().to(device)
+    edge_index = A.to_sparse().indices()
     return edge_index
 
   def create_tonnetz_edge_attr(edge_index):
@@ -160,5 +160,5 @@ class TonnetzUtil():
         distance = (edge_index[1][i] - edge_index[0][i]).item()
         edge_attr_indices.append(TonnetzUtil.NEIGHBOUR_DISTANCES.index(distance))
 
-    edge_attr = F.one_hot(torch.tensor(edge_attr_indices)).to(device)
+    edge_attr = F.one_hot(torch.tensor(edge_attr_indices))
     return edge_attr
