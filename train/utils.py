@@ -3,6 +3,7 @@ import mido
 import math
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 class MidiUtil():
   def get_midi_timesteps(filename):
@@ -127,3 +128,37 @@ class MidiUtil():
     num_slices = len(timestep_tensor) - window_size
     notes_tensor = timestep_tensor.transpose(0, 1)
     return [[notes_tensor[:, i:i+window_size], notes_tensor[:, i+window_size]] for i in range(num_slices)]
+
+
+class TonnetzUtil():
+  # In Tonnetz, each node has six neighbours which have pitches of the following distances (in semi-tones)
+  # E.g. C4 has neighbours F3, G#3, A3, D#4, E4, G4
+  NEIGHBOUR_DISTANCES = [-7, -4, -3, 3, 4, 7]
+
+  def create_tonnetz_adjacency_matrix(num_notes):
+    # In Tonnetz, each node has six neighbours which have pitches of the following distances (in semi-tones)
+    # E.g. C4 has neighbours F3, G#3, A3, D#4, E4, G4
+    A = []
+    for i in range(num_notes):
+      row = torch.zeros(num_notes, dtype=torch.int)
+      for d in TonnetzUtil.NEIGHBOUR_DISTANCES:
+        j = i+d
+        if j >= 0 and j < num_notes:
+            row[j] = 1
+      A.append(row)
+    A = torch.stack(A)
+    # Check that A is symmetric since the Tonnetz graph is undirected
+    assert(torch.equal(A, A.transpose(0, 1)))
+
+    # Convert to sparse format expected by PyG layers
+    edge_index = A.to_sparse().indices().to(device)
+    return edge_index
+
+  def create_tonnetz_edge_attr(edge_index):
+    edge_attr_indices = []
+    for i in range(edge_index.shape[1]):
+        distance = (edge_index[1][i] - edge_index[0][i]).item()
+        edge_attr_indices.append(TonnetzUtil.NEIGHBOUR_DISTANCES.index(distance))
+
+    edge_attr = F.one_hot(torch.tensor(edge_attr_indices)).to(device)
+    return edge_attr
