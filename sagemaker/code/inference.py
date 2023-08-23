@@ -329,7 +329,7 @@ class MPNNModel(nn.Module):
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 NUM_NOTES = 64
-WINDOW_SIZE = 48
+WINDOW_SIZE = 64
 NEIGHBOUR_DISTANCES = [-7, -4, -3, 3, 4, 7]
 NOTES_DELIMITER = ','
 TICKS_DELIMITER = ';'
@@ -413,7 +413,7 @@ def generate_music(model, seed, timesteps, max_notes=6):
 def model_fn(model_dir):
     edge_index = create_tonnetz_adjacency_matrix(NUM_NOTES)
     edge_attr = create_tonnetz_edge_attr(edge_index)
-    model = MPNNModel(edge_index, edge_attr, in_dim=WINDOW_SIZE, num_layers=4, emb_dim=48, out_dim=1)
+    model = MPNNModel(edge_index, edge_attr, in_dim=WINDOW_SIZE, num_layers=5, emb_dim=64, out_dim=1)
     with open(os.path.join(model_dir, "model.pth"), "rb") as f:
         model.load_state_dict(torch.load(f, map_location=torch.device('cpu')))
     model.to(device).eval()
@@ -423,16 +423,18 @@ def model_fn(model_dir):
 # data preprocessing
 def input_fn(request_body, request_content_type):
     assert request_content_type == "application/json"
-    notes_str = json.loads(request_body)["inputs"]
+    request_json = json.loads(request_body)
+    notes_str = request_json["inputs"]
+    timesteps = request_json["timesteps"]
     data = notes_str_to_tensor(notes_str, num_notes=NUM_NOTES)
-    return data
+    return {'data': data, 'timesteps': timesteps}
 
 
 # inference
 def predict_fn(input_object, model):
-    timesteps = 16
+    timesteps = int(input_object['timesteps'])
     # Pad or trim input_object tensor to the correct WINDOW_SIZE
-    seed = torch.cat((torch.zeros((NUM_NOTES, WINDOW_SIZE)), input_object), dim=1)[:, -WINDOW_SIZE:]
+    seed = torch.cat((torch.zeros((NUM_NOTES, WINDOW_SIZE)), input_object['data']), dim=1)[:, -WINDOW_SIZE:]
     prediction = generate_music(model, seed, timesteps)
     return prediction
 
