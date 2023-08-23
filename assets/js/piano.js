@@ -71,6 +71,7 @@ class Piano {
 		this.sampler = this.initialiseSampler();
 		this.toneStarted = false;
 		this.isCallingModel = false;
+		this.lastActivity = new Date();
 		this.noteHistory = [];
 		
 		this.canvas = document.getElementById(canvasId);
@@ -234,10 +235,19 @@ class Piano {
 		}
 	}
 	
+	checkActivity() {
+		const timeout = 5 * 60 * 1000; // in milliseconds
+		if (new Date() - this.lastActivity > timeout) {
+			console.log('No user activity, stopping model...');
+			this.stopCallModel();
+		}
+	}
+	
 	startCallModel() {
 		if (!this.isCallingModel) {
 			this.isCallingModel = true;
 			this.callModelIntervalId = setInterval(() => this.callModel(), 2000);
+			this.checkActivityIntervalId = setInterval(() => this.checkActivity(), 5000);
 		}
 	}
 	
@@ -246,10 +256,14 @@ class Piano {
 			this.isCallingModel = false;
 			clearInterval(this.callModelIntervalId);
 		}
+		if (typeof this.checkActivityIntervalId !== 'undefined') {
+			clearInterval(this.checkActivityIntervalId);
+		}
 	}
 	
 	keyboardClicked(event) {
 		this.startTone();
+		this.lastActivity = new Date();
 		this.startCallModel();
 		
 		globalMouseDown = true;
