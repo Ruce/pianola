@@ -12,8 +12,16 @@ var notesCanvas;
 var globalMouseDown = false;
 var endpointBaseUrl = 'https://vcnf5f6zo2.execute-api.eu-west-2.amazonaws.com/beta/next-notes?';
 
+function hideLoader() {
+	document.getElementById('loaderCircle').classList.add('complete');
+	document.getElementById('loaderText').classList.add('complete');
+	document.getElementById('loaderCheckmark').classList.add('draw');
+	setTimeout(() => document.getElementById("connectionLoader").style.display = "none", 2500);
+}
+
 function initialisePage() {
 	model = new PianolaModel(endpointBaseUrl);
+	model.connectToModel(hideLoader);
 	piano = new Piano('pianoCanvas', octaves, model);
 	notesCanvas = new NotesCanvas('notesCanvas', piano);
 }

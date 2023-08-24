@@ -1,7 +1,6 @@
 class PianolaModel {
 	constructor(endpoint) {
 		this.endpoint = endpoint;
-		this.connectToModel();
 		this.noteHistory = []; // Array tracking the history of generated notes (ordered from earliest to most recent)
 	}
 	
@@ -44,17 +43,20 @@ class PianolaModel {
 		return data;
 	}
 	
-	async connectToModel() {
+	async connectToModel(callback) {
 		var modelConnected = false;
 		do {
 			const data = await this.queryModel(";");
 			console.log('Data:', data);
 			
 			if (!data.hasOwnProperty('message')) {
+				// Expected response received, trigger callback
 				modelConnected = true;
-				document.getElementById("connectionLoader").style.display = "none";
+				callback();
+				
 			}
 			
+			// Wait a short while before trying to connect to model again
 			if (!modelConnected) { setTimeout(500); }
 		} while (!modelConnected);
 		
