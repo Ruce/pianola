@@ -204,8 +204,8 @@ class Piano {
 		// Draw note on canvas
 		if (typeof this.notesCanvas !== 'undefined') {
 			if (typeof time !== 'undefined') {
-				// Note was triggered using Transport, so schedule drawing using Tone.Draw callback
-				Tone.Draw.schedule(() => this.notesCanvas.addNoteBar(pianoKey, currTime, false), time);
+				// Note was triggered using Transport, so draw note with non-player colours
+				this.notesCanvas.addNoteBar(pianoKey, currTime, false);
 			} else {
 				this.notesCanvas.addNoteBar(pianoKey, currTime, true);
 			}
@@ -220,11 +220,11 @@ class Piano {
 	async callModel() {
 		//const start = typeof this.prevCallEnd === 'undefined' ? 0 : this.prevCallEnd;
 		const end = Tone.Time(Tone.Transport.position).toTicks();
-		const start = Math.max(0, end - Tone.Time('4').toTicks());
+		const start = Math.max(0, end - Tone.Time('8').toTicks());
 		this.prevCallEnd = end;
 		
 		const recentHistory = Note.getRecentHistory(this.noteHistory, start);
-		const buffer = Tone.Time("2").toTicks()
+		const buffer = Tone.Time("1").toTicks()
 		const generated = await this.model.generateNotes(recentHistory, start, end, buffer);
 		
 		// Check if the model is still active (i.e. hasn't been stopped) before scheduling notes
@@ -246,7 +246,7 @@ class Piano {
 	startCallModel() {
 		if (!this.isCallingModel) {
 			this.isCallingModel = true;
-			this.callModelIntervalId = setInterval(() => this.callModel(), 2000);
+			this.callModelIntervalId = setInterval(() => this.callModel(), 1000);
 			this.checkActivityIntervalId = setInterval(() => this.checkActivity(), 5000);
 		}
 	}

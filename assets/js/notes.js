@@ -59,10 +59,10 @@ class NotesCanvas {
 		if (this.activeBars.length > 0) {
 			const newActiveBars = [];
 			const currTime = new Date();
-			const rectHeight = this.canvas.height / 25;
+			const rectHeight = this.canvas.height / 26;
 			
 			for (const n of this.activeBars) {
-				const rectY = this.canvas.height - ((currTime - n.startTime) * this.canvas.height / 4000);
+				const rectY = this.canvas.height - ((currTime - n.startTime) * this.canvas.height / 3000);
 				const noteWidth = n.isWhiteKey ? this.piano.whiteKeyWidth : this.piano.blackKeyWidth;
 				
 				if (n.isPlayedByUser) {

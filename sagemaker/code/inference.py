@@ -190,7 +190,6 @@ def scatter(src: torch.Tensor, index: torch.Tensor, dim: int = -1,
 # ---------------- End of scatter function ----------------
 ###########################################################
 
-
 class MPNNLayer(MessagePassing):
     def __init__(self, emb_dim=64, edge_dim=6, aggr='add'):
         """Message Passing Neural Network Layer
@@ -203,21 +202,7 @@ class MPNNLayer(MessagePassing):
         super().__init__(aggr=aggr)
 
         self.emb_dim = emb_dim
-
-        # MLP `\psi` for computing messages `m_ij`
-        # dims: (2d + d_e) -> d
-        #self.mlp_msg = Sequential(
-        #    Linear(2*emb_dim, emb_dim), BatchNorm1d(emb_dim), ReLU(),
-        #    Linear(emb_dim, emb_dim), BatchNorm1d(emb_dim), ReLU()
-        #  )
         self.mlp_msg = Sequential(Linear(2*emb_dim + edge_dim, emb_dim), ReLU(), Linear(emb_dim, emb_dim), ReLU())
-
-        # MLP `\phi` for computing updated node features `h_i^{l+1}`
-        # dims: 2d -> d
-        #self.mlp_upd = Sequential(
-        #    Linear(2*emb_dim, emb_dim), BatchNorm1d(emb_dim), ReLU(),
-        #    Linear(emb_dim, emb_dim), BatchNorm1d(emb_dim), ReLU()
-        #  )
         self.mlp_upd = Sequential(Linear(2*emb_dim, emb_dim), ReLU(), Linear(emb_dim, emb_dim), ReLU())
 
     def forward(self, h, edge_index, edge_attr):
@@ -278,7 +263,7 @@ class MPNNLayer(MessagePassing):
         return (f'{self.__class__.__name__}(emb_dim={self.emb_dim}, aggr={self.aggr})')
 
 class MPNNModel(nn.Module):
-    def __init__(self, edge_index, edge_attr, in_dim, num_layers, emb_dim, out_dim=1):
+    def __init__(self, edge_index, edge_attr, in_dim, num_layers=4, emb_dim=64, out_dim=1):
         """Message Passing Neural Network model for graph property prediction
 
         Args:
@@ -296,7 +281,6 @@ class MPNNModel(nn.Module):
         # Linear projection for initial node features
         # dim: d_n -> d
         self.lin_in1 = Linear(in_dim, emb_dim)
-        self.lin_in2 = Linear(emb_dim, emb_dim)
 
         # Stack of MPNN layers
         self.convs = torch.nn.ModuleList()
@@ -305,26 +289,76 @@ class MPNNModel(nn.Module):
 
         # Linear prediction head
         # dim: d -> out_dim
-        self.lin_pred1 = Linear(emb_dim, emb_dim)
-        self.lin_pred2 = Linear(emb_dim, out_dim)
+        self.lin_pred1 = Linear(emb_dim, out_dim)
 
     def forward(self, x):
         """
         Args:
-          data: (PyG.Data) - batch of PyG graphs
+            data: (PyG.Data) - batch of PyG graphs
 
         Returns:
-          out: (batch_size, out_dim) - prediction for each graph
+            out: (batch_size, out_dim) - prediction for each graph
         """
-        h = F.relu(self.lin_in1(x))
-        h = F.relu(self.lin_in2(h))
-
+        h = self.lin_in1(x)
         for conv in self.convs:
-            h = conv(h, self.edge_index, self.edge_attr)
+            h = h + conv(h, self.edge_index, self.edge_attr)
+        out = self.lin_pred1(h)
+        out = torch.sum(out, dim=-2)
+        return out
 
-        h = F.relu(self.lin_pred1(h))
-        out = self.lin_pred2(h)
-        return out.squeeze(-1)
+class EncoderModel(nn.Module):
+    def __init__(self, edge_index, edge_attr, in_dim, num_layers, num_notes, emb_dim, out_dim, first_channel, second_channel, pos_emb_dim, pos_out_dim):
+        super().__init__()
+        self.conv1 = nn.Conv1d(1, first_channel, kernel_size=3, stride=1, padding=1)
+        self.pool1 = nn.MaxPool1d(2)
+        self.conv2 = nn.Conv1d(first_channel, second_channel, kernel_size=3, stride=1, padding=1)
+        self.pool2 = nn.MaxPool1d(2)
+        self.flatten = nn.Flatten()
+        linear1_in_dim = int(num_notes * second_channel / 4)
+        self.linear1 = nn.Linear(linear1_in_dim, pos_emb_dim)
+        self.linear2 = nn.Linear(pos_emb_dim, pos_out_dim)
+
+        self.mpnn = MPNNModel(edge_index, edge_attr, in_dim, num_layers, emb_dim, out_dim)
+    
+    def forward(self, x):
+        h = self.mpnn(x)
+
+        # Convolution of x to get positional information
+        pos = torch.reshape(x, (x.shape[0] * x.shape[1], 1, -1))
+        pos = F.relu(self.conv1(pos))
+        pos = self.pool1(pos)
+        pos = F.relu(self.conv2(pos))
+        pos = self.pool2(pos)
+        pos = self.flatten(pos)
+        pos = F.relu(self.linear1(pos))
+        pos = self.linear2(pos)
+        pos = torch.reshape(pos, (x.shape[0], x.shape[1], -1))
+        return torch.cat((h, pos), dim=-1)
+
+class SequenceModel(nn.Module):
+    def __init__(self, in_dim, hidden_dim, num_notes):
+        super().__init__()
+        self.lstm = nn.LSTM(in_dim, hidden_dim, batch_first=True)
+        self.linear = nn.Linear(hidden_dim, num_notes)
+
+    def forward(self, x, h_0=None, c_0=None):
+        if h_0 is None or c_0 is None:
+            lstm_out, (h_n, c_n) = self.lstm(x)
+        else:
+            lstm_out, (h_n, c_n) = self.lstm(x, (h_0, c_0))
+        y_hat = self.linear(lstm_out)
+        return y_hat, (h_n, c_n)
+
+class EncodeDecode(nn.Module):
+    def __init__(self, edge_index, edge_attr, num_notes, en_in_dim, en_num_layers, en_emb_dim, en_out_dim, first_channel, second_channel, pos_emb_dim, pos_out_dim, de_emb_dim):
+        super().__init__()
+        self.encoder = EncoderModel(edge_index, edge_attr, en_in_dim, en_num_layers, num_notes, en_emb_dim, en_out_dim, first_channel, second_channel, pos_emb_dim, pos_out_dim)
+        self.decoder = SequenceModel(en_out_dim + pos_out_dim, de_emb_dim, num_notes)
+
+    def forward(self, x):
+        h = self.encoder(x)
+        out, (_, _) = self.decoder(h)
+        return out
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -363,22 +397,22 @@ def create_tonnetz_edge_attr(edge_index):
     return edge_attr
 
 def notes_tensor_to_str(notes_tensor):
-    ticks = notes_tensor.shape[1]
+    ticks = notes_tensor.shape[0]
 
     notes_list = []
     for t in range(ticks):
-        active_notes_in_slice = torch.nonzero(notes_tensor[:, t], as_tuple=True)[0]
+        active_notes_in_slice = torch.nonzero(notes_tensor[t], as_tuple=True)[0]
         notes_list.append(NOTES_DELIMITER.join([str(n) for n in active_notes_in_slice.tolist()])) # Convert tensor to list to string
     return TICKS_DELIMITER.join(notes_list)
 
 def notes_str_to_tensor(notes_str, num_notes):
     notes_slices = notes_str.split(TICKS_DELIMITER)
-    notes_tensor = torch.zeros((num_notes, len(notes_slices)))
+    notes_tensor = torch.zeros((len(notes_slices), num_notes))
 
     for t, active_notes_str in enumerate(notes_slices):
         if len(active_notes_str) != 0:
             active_notes = [int(n) for n in active_notes_str.split(NOTES_DELIMITER)]
-            notes_tensor[active_notes, t] = 1
+            notes_tensor[t, active_notes] = 1
     return notes_tensor
   
 def decode_tensor(y_hat, max_notes):
@@ -392,28 +426,26 @@ def decode_tensor(y_hat, max_notes):
     return sample
 
 def generate_music(model, seed, timesteps, max_notes=6):
-    generated = seed
-    window_size = seed.shape[1]
+    # Input `seed` and output shapes: (timesteps, num_notes)
+    # For conv-sequence model, expected input shape is (batch_size, timesteps, num_notes, 1)
+    generated = seed.unsqueeze(dim=0).unsqueeze(dim=-1)
+    window_size = generated.shape[1]
 
     model.eval()
     with torch.no_grad():
         for i in range(timesteps):
-            if i == 0:
-                pred = model(seed)
-            else:
-                pred = model(generated[:, -window_size:])
-
-            y_hat = torch.sigmoid(pred)
-            new_notes = decode_tensor(y_hat, max_notes)
-            generated = torch.cat((generated, new_notes.unsqueeze(1)), dim=1)
-    return generated[:, -timesteps:]
+            pred = model(generated[:, -window_size:])
+            y_hat = torch.sigmoid(pred[:, -1]).squeeze(dim=0) # Keep only the last timestep and remove batch_size dimension
+            new_notes = decode_tensor(y_hat, max_notes) # Decode probabilities in y_hat
+            generated = torch.cat((generated, new_notes.reshape((1, 1, -1, 1))), dim=1)
+    return generated[0, -timesteps:].squeeze(dim=-1) # Remove batch_size and node_features dimensions
 
 
 # defining model and loading weights to it.
 def model_fn(model_dir):
     edge_index = create_tonnetz_adjacency_matrix(NUM_NOTES)
     edge_attr = create_tonnetz_edge_attr(edge_index)
-    model = MPNNModel(edge_index, edge_attr, in_dim=WINDOW_SIZE, num_layers=5, emb_dim=64, out_dim=1)
+    model = EncodeDecode(edge_index, edge_attr, num_notes=NUM_NOTES, en_in_dim=1, en_num_layers=2, en_emb_dim=8, en_out_dim=8, first_channel=8, second_channel=32, pos_emb_dim=128, pos_out_dim=64, de_emb_dim=256)
     with open(os.path.join(model_dir, "model.pth"), "rb") as f:
         model.load_state_dict(torch.load(f, map_location=torch.device('cpu')))
     model.to(device).eval()
@@ -433,8 +465,9 @@ def input_fn(request_body, request_content_type):
 # inference
 def predict_fn(input_object, model):
     timesteps = int(input_object['timesteps'])
-    # Pad or trim input_object tensor to the correct WINDOW_SIZE
-    seed = torch.cat((torch.zeros((NUM_NOTES, WINDOW_SIZE)), input_object['data']), dim=1)[:, -WINDOW_SIZE:]
+    # Pad or trim input_object['data'] tensor to the correct WINDOW_SIZE
+    padding = torch.zeros((WINDOW_SIZE, NUM_NOTES))
+    seed = torch.cat((padding, input_object['data']), dim=0)[-WINDOW_SIZE:]
     prediction = generate_music(model, seed, timesteps)
     return prediction
 
