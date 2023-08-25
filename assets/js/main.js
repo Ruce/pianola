@@ -16,7 +16,7 @@ function hideLoader() {
 	document.getElementById('loaderCircle').classList.add('complete');
 	document.getElementById('loaderText').classList.add('complete');
 	document.getElementById('loaderCheckmark').classList.add('draw');
-	setTimeout(() => document.getElementById("connectionLoader").style.display = "none", 2500);
+	setTimeout(() => document.getElementById("connectionLoader").style.display = "none", 1700);
 }
 
 function initialisePage() {

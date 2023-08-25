@@ -63,7 +63,7 @@ canvas {
 .loaderText.complete {
 	max-width: 0;
 	opacity: 0;
-	transition: max-width 800ms linear, opacity 800ms;
+	transition: max-width 700ms linear, opacity 700ms;
 }
 
 .loaderCircle {
@@ -73,14 +73,14 @@ canvas {
   border-radius: 50%;
   width: 25px;
   height: 25px;
-  animation: spin 2s linear infinite;
+  animation: spin 1500ms linear infinite;
   vertical-align: middle;
 }
 
 .loaderCircle.complete {
 	border-color: green;
-	transition: border 400ms ease-out;
-  animation: spin 1s linear 1;
+	transition: border 500ms ease-out;
+  animation: spin 1200ms linear 1;
 }
 
 .loaderCheckmark {
@@ -96,7 +96,7 @@ canvas {
 }
 
 .loaderCheckmark.draw {
-	animation-duration: 2000ms;
+	animation-duration: 1300ms;
   animation-timing-function: ease;
 	animation-fill-mode: forwards;
   animation-name: drawCheckmark;
@@ -115,12 +115,12 @@ canvas {
     width: 0;
 		opacity: 0;
   }
-	60% {
+  70% {
     height: 0;
     width: 0;
 		opacity: 0;
   }
-  75% {
+  85% {
     height: 0;
     width: 4px;
 		opacity: 1;
