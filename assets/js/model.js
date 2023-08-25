@@ -44,21 +44,16 @@ class PianolaModel {
 	}
 	
 	async connectToModel(callback) {
-		var modelConnected = false;
-		do {
-			const data = await this.queryModel(";");
-			console.log('Data:', data);
-			
-			if (!data.hasOwnProperty('message')) {
-				// Expected response received, trigger callback
-				modelConnected = true;
-				callback();
-			}
-			
-			// Wait a short while before trying to connect to model again
-			if (!modelConnected) { setTimeout(500); }
-		} while (!modelConnected);
+		const data = await this.queryModel(";");
+		console.log('Data:', data);
 		
+		if (!data.hasOwnProperty('message')) {
+			// Expected response received, trigger callback
+			callback();
+		} else {
+			// Wait a short while before trying to connect to model again
+			setTimeout(this.connectToModel.bind(this, callback), 500);
+		}
 	}
 	
 	async generateNotes(prevHistory, start, end, buffer) {

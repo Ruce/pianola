@@ -75,6 +75,10 @@ class Piano {
 		this.noteHistory = [];
 		this.activeKeys = [];
 		
+		this.bufferBeats = 2;
+		this.historyWindowBeats = 16;
+		this.setBPM(88);
+		
 		this.canvas = document.getElementById(canvasId);
 		this.animationQueued = false;
 		this.triggerDraw();
@@ -189,6 +193,11 @@ class Piano {
 		}
 	}
 	
+	setBPM(bpm) {
+		Tone.Transport.bpm.value = bpm;
+		this.callModelSeconds = this.bufferBeats / bpm * 60;
+	}
+	
 	startTone() {
 		if (!this.toneStarted) { 
 			Tone.start().then(() => {
@@ -223,11 +232,11 @@ class Piano {
 	async callModel() {
 		//const start = typeof this.prevCallEnd === 'undefined' ? 0 : this.prevCallEnd;
 		const end = Tone.Time(Tone.Transport.position).toTicks();
-		const start = Math.max(0, end - Tone.Time('8').toTicks());
+		const start = Math.max(0, end - Tone.Time(`0:${this.historyWindowBeats}`).toTicks());
 		this.prevCallEnd = end;
 		
 		const recentHistory = Note.getRecentHistory(this.noteHistory, start);
-		const buffer = Tone.Time("1").toTicks()
+		const buffer = Tone.Time(`0:${this.bufferBeats}`).toTicks()
 		const generated = await this.model.generateNotes(recentHistory, start, end, buffer);
 		
 		// Check if the model is still active (i.e. hasn't been stopped) before scheduling notes
@@ -249,7 +258,7 @@ class Piano {
 	startCallModel() {
 		if (!this.isCallingModel) {
 			this.isCallingModel = true;
-			this.callModelIntervalId = setInterval(() => this.callModel(), 1000);
+			this.callModelIntervalId = setInterval(() => this.callModel(), this.callModelSeconds*1000);
 			this.checkActivityIntervalId = setInterval(() => this.checkActivity(), 5000);
 		}
 	}
