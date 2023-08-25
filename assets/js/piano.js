@@ -73,13 +73,16 @@ class Piano {
 		this.isCallingModel = false;
 		this.lastActivity = new Date();
 		this.noteHistory = [];
+		this.activeKeys = [];
 		
 		this.canvas = document.getElementById(canvasId);
-		this.drawKeyboard();
+		this.animationQueued = false;
+		this.triggerDraw();
 		this.canvas.addEventListener('mousedown', this.keyboardClicked.bind(this));
 		this.canvas.addEventListener('mousemove', this.mouseMoveKeyboard.bind(this));
 		this.canvas.addEventListener('mouseout', this.mouseOutKeyboard.bind(this));
 		
+		this.hoverKey = null;
 		this.prevHoverKey = null;
 	}
 	
@@ -97,8 +100,8 @@ class Piano {
 	
 	static get keyFill() {
 		return {
-			'white': {'inactive': '#FEFEFE', 'active': '#FEF3B0'},
-			'black': {'inactive': '#595959', 'active': '#C09200'}
+			white: {inactive: '#FEFEFE', hover: '#FFF9D7', playerPress: '#FEF3B0', botPress: '#A6DDDF'},
+			black: {inactive: '#595959', hover: '#D0AD40', playerPress: '#C09200', botPress: '#478C8F'}
 		};
 	}
 	
@@ -197,18 +200,18 @@ class Piano {
 	
 	playNote(pianoKey, time, transportPosition=Tone.Transport.position) {
 		const currTime = new Date();
-		
 		this.sampler.triggerAttackRelease(pianoKey.keyName, 0.25, time);
+		
+		const isPlayer = (typeof time === 'undefined');
+		const endTime = new Date(currTime);
+		endTime.setMilliseconds(endTime.getMilliseconds() + 200); // Key lights up for 200 milliseconds
+		this.activeKeys.push({key: pianoKey, endTime: endTime, isPlayer: isPlayer});
 		this.noteHistory.push(new Note(pianoKey.keyNum, transportPosition));
 		
+		this.triggerDraw();
 		// Draw note on canvas
 		if (typeof this.notesCanvas !== 'undefined') {
-			if (typeof time !== 'undefined') {
-				// Note was triggered using Transport, so draw note with non-player colours
-				this.notesCanvas.addNoteBar(pianoKey, currTime, false);
-			} else {
-				this.notesCanvas.addNoteBar(pianoKey, currTime, true);
-			}
+			this.notesCanvas.addNoteBar(pianoKey, currTime, isPlayer);
 		}
 		return transportPosition;
 	}
@@ -272,24 +275,32 @@ class Piano {
 	}
 	
 	mouseMoveKeyboard(event) {
-		const hoverKey = this.getKeyByCoord(event.clientX, event.clientY);
-		if (this.prevHoverKey === null || this.prevHoverKey.keyNum !== hoverKey.keyNum) {
+		this.hoverKey = this.getKeyByCoord(event.clientX, event.clientY);
+		if (this.prevHoverKey === null || this.prevHoverKey.keyNum !== this.hoverKey.keyNum) {
 			// Newly moused over key
-			this.drawKeyboard(hoverKey);
+			this.triggerDraw();
 			if (globalMouseDown) {
-				this.playNote(hoverKey);
+				this.playNote(this.hoverKey);
 			}
-			this.prevHoverKey = hoverKey;
+			this.prevHoverKey = this.hoverKey;
 		}
 	}
 	
 	mouseOutKeyboard(event) {
-		this.drawKeyboard();
+		this.triggerDraw();
+		this.hoverKey = null;
 		this.prevHoverKey = null;
 	}
 	
-	drawKeyboard(hoverKey) {
-		const hoverKeyDefined = (typeof hoverKey !== 'undefined');
+	triggerDraw() {
+		if (!this.animationQueued) {
+			this.animationQueued = true;
+			window.requestAnimationFrame(() => this.drawKeyboard());
+		}
+	}
+	
+	drawKeyboard() {
+		const hoverKeyDefined = (this.hoverKey !== null);
 		
 		const ctx = this.canvas.getContext('2d');
 		this.canvas.width = window.innerWidth;
@@ -302,11 +313,28 @@ class Piano {
 		this.blackKeyHeight = this.whiteKeyHeight * Piano.blackKeyHeightRatio;
 		const [whiteKeyWidth, whiteKeyHeight, blackKeyWidth, blackKeyHeight] = [this.whiteKeyWidth, this.whiteKeyHeight, this.blackKeyWidth, this.blackKeyHeight];
 		
+		// Remove expired keys and get the colourKeyNums for active keys
+		this.activeKeys = this.activeKeys.filter((k) => k.endTime >= new Date());
+		function getActiveKeyNums(activeKeys, getWhiteKey, getPlayerKey) {
+			return activeKeys.filter((k) => (k.key.isWhiteKey === getWhiteKey) && (k.isPlayer === getPlayerKey)).map((k) => k.key.colourKeyNum);
+		}
+		const activeWhiteKeysPlayer = getActiveKeyNums(this.activeKeys, true, true);
+		const activeWhiteKeysBot = getActiveKeyNums(this.activeKeys, true, false);
+		const activeBlackKeysPlayer = getActiveKeyNums(this.activeKeys, false, true);
+		const activeBlackKeysBot = getActiveKeyNums(this.activeKeys, false, false);
+		
 		for (let i = 0; i < this.numWhiteKeys; i++) {
 			ctx.fillStyle = Piano.keyFill.white.inactive;
-			if (hoverKeyDefined && hoverKey.isWhiteKey && hoverKey.colourKeyNum === i) {
-				ctx.fillStyle = Piano.keyFill.white.active;
+			
+			// Priority: player press > bot press > hover
+			if (activeWhiteKeysPlayer.includes(i)) {
+				ctx.fillStyle = Piano.keyFill.white.playerPress;
+			} else if (activeWhiteKeysBot.includes(i)) {
+				ctx.fillStyle = Piano.keyFill.white.botPress;
+			} else if (hoverKeyDefined && this.hoverKey.isWhiteKey && this.hoverKey.colourKeyNum === i) {
+				ctx.fillStyle = Piano.keyFill.white.hover;
 			}
+			
 			const x = this.getXCoordByKey(true, i);
 			ctx.fillRect(x, 0, whiteKeyWidth, whiteKeyHeight);
 			ctx.strokeRect(x, 0, whiteKeyWidth, whiteKeyHeight);
@@ -314,12 +342,24 @@ class Piano {
 
 		for (let i = 0; i < this.numBlackKeys; i++) {
 			ctx.fillStyle = Piano.keyFill.black.inactive;
-			if (hoverKeyDefined && !hoverKey.isWhiteKey && hoverKey.colourKeyNum === i) {
-				ctx.fillStyle = Piano.keyFill.black.active;
+			
+			// Priority: player press > bot press > hover
+			if (activeBlackKeysPlayer.includes(i)) {
+				ctx.fillStyle = Piano.keyFill.black.playerPress;
+			} else if (activeBlackKeysBot.includes(i)) { // Prioritise player keys
+				ctx.fillStyle = Piano.keyFill.black.botPress;
+			} else if (hoverKeyDefined && !this.hoverKey.isWhiteKey && this.hoverKey.colourKeyNum === i) {
+				ctx.fillStyle = Piano.keyFill.black.hover;
 			}
+			
 			const x = this.getXCoordByKey(false, i);
 			ctx.fillRect(x, 0, blackKeyWidth, blackKeyHeight);
 			ctx.strokeRect(x, 0, blackKeyWidth, blackKeyHeight);
+		}
+		
+		this.animationQueued = false;
+		if (this.activeKeys.length > 0) {
+			this.triggerDraw();
 		}
 	}
 	
