@@ -53,7 +53,6 @@ class PianolaModel {
 				// Expected response received, trigger callback
 				modelConnected = true;
 				callback();
-				
 			}
 			
 			// Wait a short while before trying to connect to model again

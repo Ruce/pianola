@@ -355,10 +355,10 @@ class EncodeDecode(nn.Module):
         self.encoder = EncoderModel(edge_index, edge_attr, en_in_dim, en_num_layers, num_notes, en_emb_dim, en_out_dim, first_channel, second_channel, pos_emb_dim, pos_out_dim)
         self.decoder = SequenceModel(en_out_dim + pos_out_dim, de_emb_dim, num_notes)
 
-    def forward(self, x):
+    def forward(self, x, h_0=None, c_0=None):
         h = self.encoder(x)
-        out, (_, _) = self.decoder(h)
-        return out
+        out, (h_n, c_n) = self.decoder(h, h_0, c_0)
+        return out, (h_n, c_n)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -433,13 +433,16 @@ def generate_music(model, seed, timesteps, max_notes=6):
 
     model.eval()
     with torch.no_grad():
+        h_n, c_n = (None, None)
         for i in range(timesteps):
-            pred = model(generated[:, -window_size:])
+            if i == 0:
+                pred, (h_n, c_n) = model(generated[:, -window_size:])
+            else:
+                pred, (h_n, c_n) = model(generated[:, -1:], h_n, c_n)
             y_hat = torch.sigmoid(pred[:, -1]).squeeze(dim=0) # Keep only the last timestep and remove batch_size dimension
             new_notes = decode_tensor(y_hat, max_notes) # Decode probabilities in y_hat
             generated = torch.cat((generated, new_notes.reshape((1, 1, -1, 1))), dim=1)
     return generated[0, -timesteps:].squeeze(dim=-1) # Remove batch_size and node_features dimensions
-
 
 # defining model and loading weights to it.
 def model_fn(model_dir):
