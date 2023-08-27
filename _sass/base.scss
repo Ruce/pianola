@@ -27,7 +27,7 @@ canvas {
 #stopMusic {
   position: absolute;
   top: 20px;
-  left: 20px;
+  right: 20px;
   width: 2.5%;
   min-width: 30px;
   min-height: 30px;
@@ -39,6 +39,21 @@ canvas {
 
 #stopMusic:hover {
   background-color: red;
+}
+
+.listener {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  text-align: left;
+  visibility: hidden;
+}
+
+.listenerText {
+  color: #f3f3f3;
+  font-size: 18px;
+  margin: 0;
+  user-select: none
 }
 
 .loaderContainer{
@@ -58,6 +73,7 @@ canvas {
 	white-space: nowrap;
 	overflow: hidden;
 	max-width: 100%;
+  user-select: none
 }
 
 .loaderText.complete {

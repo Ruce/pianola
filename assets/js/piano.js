@@ -71,6 +71,7 @@ class Piano {
 		this.sampler = this.initialiseSampler();
 		this.toneStarted = false;
 		this.isCallingModel = false;
+		this.listeningToPlayer = false;
 		this.lastActivity = new Date();
 		this.noteHistory = [];
 		this.activeKeys = [];
@@ -264,19 +265,41 @@ class Piano {
 	}
 	
 	stopCallModel() {
-		if (this.isCallingModel && typeof this.callModelIntervalId !== 'undefined') {
-			this.isCallingModel = false;
+		this.isCallingModel = false;
+		this.noteHistory = [];
+		this.listeningToPlayer = false;
+		Tone.Transport.cancel();
+		
+		if (typeof this.callModelIntervalId !== 'undefined') {
 			clearInterval(this.callModelIntervalId);
 		}
 		if (typeof this.checkActivityIntervalId !== 'undefined') {
 			clearInterval(this.checkActivityIntervalId);
+		}
+		if (typeof this.listenerTimeoutId !== 'undefined') {
+			clearTimeout(this.listenerTimeoutId);
+			document.getElementById("listener").style.visibility = "hidden";
+		}
+	}
+	
+	listenToPlayer() {
+		const listenerElement = document.getElementById("listener");
+		if (new Date() - this.lastActivity > 2000) {
+			this.startCallModel();
+			listenerElement.style.visibility = "hidden";
+		} else {
+			this.listenerTimeoutId = setTimeout(this.listenToPlayer.bind(this), 100)
+			listenerElement.style.visibility = "visible";
 		}
 	}
 	
 	keyboardClicked(event) {
 		this.startTone();
 		this.lastActivity = new Date();
-		this.startCallModel();
+		if (!this.listeningToPlayer) {
+			this.listeningToPlayer = true;
+			this.listenToPlayer();
+		}
 		
 		globalMouseDown = true;
 		const clickedKey = this.getKeyByCoord(event.clientX, event.clientY);
