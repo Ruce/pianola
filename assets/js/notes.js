@@ -55,7 +55,8 @@ class NotesCanvas {
 		//ctx.fillStyle = 'red';
 		//ctx.fillRect(0, new Date().getMilliseconds() / 10, 10, 10);
 		
-		ctx.shadowBlur = 10;
+		const shadowBlur = 10;
+		ctx.shadowBlur = shadowBlur;
 		if (this.activeBars.length > 0) {
 			const newActiveBars = [];
 			const currTime = new Date();
@@ -77,7 +78,7 @@ class NotesCanvas {
 				ctx.roundRect(n.x, rectY, noteWidth, rectHeight, 3);
 				ctx.fill();
 				
-				if (rectY + rectHeight > 0) {
+				if (rectY + rectHeight + shadowBlur > 0) {
 					newActiveBars.push(n);
 				}
 			}
