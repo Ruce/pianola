@@ -27,7 +27,7 @@ function initialisePage() {
 }
 
 function redrawCanvases() {
-	piano.drawKeyboard();
+	piano.pianoCanvas.triggerDraw();
 	notesCanvas.draw();
 }
 

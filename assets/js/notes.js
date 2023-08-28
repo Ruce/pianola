@@ -31,7 +31,7 @@ class NotesCanvas {
 	}
 	
 	addNoteBar(pianoKey, currTime, isPlayedByUser) {
-		const x = this.piano.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
+		const x = this.piano.pianoCanvas.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
 		this.activeBars.push({startTime: currTime, x: x, isWhiteKey: pianoKey.isWhiteKey, isPlayedByUser: isPlayedByUser});
 		
 		if (!this.animationActive) {
@@ -47,7 +47,7 @@ class NotesCanvas {
 	draw() {
 		const ctx = this.canvas.getContext('2d');
 		this.canvas.width = window.innerWidth;
-		this.canvas.height = window.innerHeight - piano.canvas.height;
+		this.canvas.height = window.innerHeight - this.piano.pianoCanvas.canvas.height;
 		ctx.fillStyle = '#222222';
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		
@@ -64,7 +64,7 @@ class NotesCanvas {
 			
 			for (const n of this.activeBars) {
 				const rectY = this.canvas.height - ((currTime - n.startTime) * this.canvas.height / 3000);
-				const noteWidth = n.isWhiteKey ? this.piano.whiteKeyWidth : this.piano.blackKeyWidth;
+				const noteWidth = n.isWhiteKey ? this.piano.pianoCanvas.whiteKeyWidth : this.piano.pianoCanvas.blackKeyWidth;
 				
 				if (n.isPlayedByUser) {
 					ctx.fillStyle = n.isWhiteKey ? '#FDFD66' : '#FFBF00';
