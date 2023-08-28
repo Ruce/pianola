@@ -16,6 +16,7 @@ class Piano {
 		this.lastActivity = new Date();
 		
 		this.bufferBeats = 2;
+		this.bufferTicks = Tone.Time(`0:${this.bufferBeats}`).toTicks();
 		this.historyWindowBeats = 16;
 		this.setBPM(88);
 	}
@@ -61,14 +62,12 @@ class Piano {
 	}
 	
 	async callModel() {
-		//const start = typeof this.prevCallEnd === 'undefined' ? 0 : this.prevCallEnd;
-		const end = Tone.Time(Tone.Transport.position).toTicks();
-		const start = Math.max(0, end - Tone.Time(`0:${this.historyWindowBeats}`).toTicks());
-		this.prevCallEnd = end;
-		
+		// From previous time the model was called, add buffer duration to get new interval for querying
+		this.callModelEnd += this.bufferTicks;
+		//const start = Math.max(0, this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks());
+		const start = this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks() + 1;
 		const recentHistory = Note.getRecentHistory(this.noteHistory, start);
-		const buffer = Tone.Time(`0:${this.bufferBeats}`).toTicks()
-		const generated = await this.model.generateNotes(recentHistory, start, end, buffer);
+		const generated = await this.model.generateNotes(recentHistory, start, this.callModelEnd, this.bufferTicks);
 		
 		// Check if the model is still active (i.e. hasn't been stopped) before scheduling notes
 		if (this.isCallingModel) {
@@ -89,6 +88,7 @@ class Piano {
 	startCallModel() {
 		if (!this.isCallingModel) {
 			this.isCallingModel = true;
+			this.callModel(); // Call model immediately, since setInterval first triggers function after the delay
 			this.callModelIntervalId = setInterval(() => this.callModel(), this.callModelSeconds*1000);
 			this.checkActivityIntervalId = setInterval(() => this.checkActivity(), 5000);
 		}
@@ -101,6 +101,8 @@ class Piano {
 		this.noteHistory = [];
 		this.model.noteHistory = [];
 		Tone.Transport.cancel();
+		Tone.Transport.stop();
+		this.toneStarted = false;
 		
 		if (typeof this.callModelIntervalId !== 'undefined') {
 			clearInterval(this.callModelIntervalId);
@@ -126,7 +128,15 @@ class Piano {
 	seedInputAwaiter() {
 		if (new Date() - this.lastActivity > 2000) {
 			clearInterval(this.listenerIntervalId);
-			Tone.Transport.position = this.lastSeedInputPosition;
+			
+			// Rewind the transport schedule to the last of the seed input so that the history fed to the model is seamless
+			// Also, slice off last notes that are in the buffer period and add it to the model's buffer history
+			
+			// Subtract twice the buffer duration from the last seed input because callModel and generateNotes each adds a buffer
+			this.callModelEnd = Tone.Time(this.lastSeedInputPosition).toTicks() - (2 * this.bufferTicks);
+			const newPosition = Tone.Time(this.lastSeedInputPosition).toSeconds() - Tone.Time(`0:${this.bufferBeats}`).toSeconds();
+			Tone.Transport.position = newPosition;
+			
 			this.awaitingPlayerInput = false;
 			this.lastSeedInputPosition = null;
 			this.startCallModel();

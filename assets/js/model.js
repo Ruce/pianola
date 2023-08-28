@@ -10,7 +10,7 @@ class PianolaModel {
 		for (let i=0; i < notesSlices.length; i++) {
 			let s = notesSlices[i];
 			if (s.length > 0) {
-				const genPosition = (basePositionTick + i*48) + "i";
+				const genPosition = (basePositionTick + (i+1)*48) + "i";
 				const notes = s.split(',');
 				for (const n of notes) {
 					generated.push(new Note(parseInt(n), genPosition));
@@ -21,13 +21,13 @@ class PianolaModel {
 	}
 	
 	static historyToQueryString(history, startTick, endTick) {
-		const numSixteenthNotes = Math.ceil((endTick - startTick) / 48);
+		const numSixteenthNotes = Math.floor((endTick - startTick) / 48) + 1;		
 		const orderedNotes = Array.from({ length: numSixteenthNotes }, () => [])
 		
 		for (const n of history) {
 			const p = Tone.Time(n.position).toTicks(); // Position of current note in Ticks
 			if (p <= endTick) {
-				const d = Math.round((p - startTick) / 48); // Delta between note and startTick in SixteenthNotes
+				const d = Math.floor((p - startTick) / 48); // Delta between note and startTick in SixteenthNotes
 				orderedNotes[d].push(n.keyNum);
 			}
 		}

@@ -6,6 +6,7 @@ class Note {
 	
 	static getRecentHistory(history, startTick) {
 		// Returns events in history that happened on or after `startTick`
+		// `history` must be an ordered list of events from first to most recent
 		const recentHistory = [];
 		for (let i = history.length - 1; i >= 0; i--) {
 			const h = history[i];
