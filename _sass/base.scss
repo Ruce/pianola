@@ -47,6 +47,7 @@ canvas {
   left: 20px;
   text-align: left;
   visibility: hidden;
+  animation: pulse 2s linear infinite;
 }
 
 .listenerText {
@@ -123,6 +124,14 @@ canvas {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  10% { opacity: 1; }
+  50% { opacity: 0.2; }
+  90% {opacity: 1; }
+  100% {opacity: 1; }
 }
 
 @keyframes drawCheckmark {

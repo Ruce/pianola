@@ -5,6 +5,7 @@ class Note {
 	}
 	
 	static getRecentHistory(history, startTick) {
+		// Returns events in history that happened on or after `startTick`
 		const recentHistory = [];
 		for (let i = history.length - 1; i >= 0; i--) {
 			const h = history[i];

@@ -11,7 +11,7 @@ class Piano {
 		
 		this.toneStarted = false;
 		this.isCallingModel = false;
-		this.listeningToPlayer = false;
+		this.awaitingPlayerInput = true;
 		this.noteHistory = [];
 		this.lastActivity = new Date();
 		
@@ -33,11 +33,9 @@ class Piano {
 	keyPressed(keyNum) {
 		this.startTone();
 		this.lastActivity = new Date();
-		if (!this.listeningToPlayer) {
-			this.listeningToPlayer = true;
-			this.listenToPlayer();
+		if (this.awaitingPlayerInput) {
+			this.seedInputListener();
 		}
-		
 		this.playNote(this.pianoKeys[keyNum]);
 	}
 	
@@ -98,8 +96,10 @@ class Piano {
 	
 	stopCallModel() {
 		this.isCallingModel = false;
+		this.awaitingPlayerInput = true;
+		this.lastSeedInputPosition = null;
 		this.noteHistory = [];
-		this.listeningToPlayer = false;
+		this.model.noteHistory = [];
 		Tone.Transport.cancel();
 		
 		if (typeof this.callModelIntervalId !== 'undefined') {
@@ -108,20 +108,29 @@ class Piano {
 		if (typeof this.checkActivityIntervalId !== 'undefined') {
 			clearInterval(this.checkActivityIntervalId);
 		}
-		if (typeof this.listenerTimeoutId !== 'undefined') {
-			clearTimeout(this.listenerTimeoutId);
+		if (typeof this.listenerIntervalId !== 'undefined') {
+			clearInterval(this.listenerIntervalId);
 			document.getElementById("listener").style.visibility = "hidden";
 		}
 	}
 	
-	listenToPlayer() {
-		const listenerElement = document.getElementById("listener");
-		if (new Date() - this.lastActivity > 2000) {
-			this.startCallModel();
-			listenerElement.style.visibility = "hidden";
-		} else {
-			this.listenerTimeoutId = setTimeout(this.listenToPlayer.bind(this), 100)
+	seedInputListener() {
+		if (typeof this.lastSeedInputPosition === 'undefined' || this.lastSeedInputPosition === null) {
+			const listenerElement = document.getElementById("listener");
 			listenerElement.style.visibility = "visible";
+			this.listenerIntervalId = setInterval(this.seedInputAwaiter.bind(this), 100)
+		}
+		this.lastSeedInputPosition = Tone.Transport.position;
+	}
+	
+	seedInputAwaiter() {
+		if (new Date() - this.lastActivity > 2000) {
+			clearInterval(this.listenerIntervalId);
+			Tone.Transport.position = this.lastSeedInputPosition;
+			this.awaitingPlayerInput = false;
+			this.lastSeedInputPosition = null;
+			this.startCallModel();
+			document.getElementById("listener").style.visibility = "hidden";
 		}
 	}
 	
