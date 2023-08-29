@@ -306,34 +306,48 @@ class MPNNModel(nn.Module):
         out = torch.sum(out, dim=-2)
         return out
 
-class EncoderModel(nn.Module):
-    def __init__(self, edge_index, edge_attr, in_dim, num_layers, num_notes, emb_dim, out_dim, first_channel, second_channel, pos_emb_dim, pos_out_dim):
+class ConvModel(nn.Module):
+    def __init__(self, num_notes, first_channel, second_channel, emb_dim, out_dim):
         super().__init__()
-        self.conv1 = nn.Conv1d(1, first_channel, kernel_size=3, stride=1, padding=1)
-        self.pool1 = nn.MaxPool1d(2)
-        self.conv2 = nn.Conv1d(first_channel, second_channel, kernel_size=3, stride=1, padding=1)
-        self.pool2 = nn.MaxPool1d(2)
+        self.conv3_1 = nn.Conv1d(1, first_channel, kernel_size=3, stride=1, padding=1)
+        self.conv3_2 = nn.Conv1d(first_channel, second_channel, kernel_size=3, stride=1, padding=1)
+        self.conv5_1 = nn.Conv1d(1, first_channel, kernel_size=5, stride=1, padding=2)
+        self.conv5_2 = nn.Conv1d(first_channel, second_channel, kernel_size=5, stride=1, padding=2)
+        self.conv7_1 = nn.Conv1d(1, first_channel, kernel_size=7, stride=1, padding=3)
+        self.conv7_2 = nn.Conv1d(first_channel, second_channel, kernel_size=7, stride=1, padding=3)
+        self.pool = nn.MaxPool1d(2)
         self.flatten = nn.Flatten()
-        linear1_in_dim = int(num_notes * second_channel / 4)
-        self.linear1 = nn.Linear(linear1_in_dim, pos_emb_dim)
-        self.linear2 = nn.Linear(pos_emb_dim, pos_out_dim)
+        
+        linear1_in_dim = int(num_notes * 3 * second_channel / 4)
+        self.linear1 = nn.Linear(linear1_in_dim, emb_dim)
+        self.linear2 = nn.Linear(emb_dim, out_dim)
 
-        self.mpnn = MPNNModel(edge_index, edge_attr, in_dim, num_layers, emb_dim, out_dim)
-    
     def forward(self, x):
-        h = self.mpnn(x)
+        h = torch.reshape(x, (x.shape[0] * x.shape[1], 1, -1))
 
-        # Convolution of x to get positional information
-        pos = torch.reshape(x, (x.shape[0] * x.shape[1], 1, -1))
-        pos = F.relu(self.conv1(pos))
-        pos = self.pool1(pos)
-        pos = F.relu(self.conv2(pos))
-        pos = self.pool2(pos)
-        pos = self.flatten(pos)
+        h3 = F.relu(self.conv3_1(h))
+        h3 = self.pool(h3)
+        h3 = F.relu(self.conv3_2(h3))
+        h3 = self.pool(h3)
+        h3 = self.flatten(h3)
+
+        h5 = F.relu(self.conv5_1(h))
+        h5 = self.pool(h5)
+        h5 = F.relu(self.conv5_2(h5))
+        h5 = self.pool(h5)
+        h5 = self.flatten(h5)
+
+        h7 = F.relu(self.conv7_1(h))
+        h7 = self.pool(h7)
+        h7 = F.relu(self.conv7_2(h7))
+        h7 = self.pool(h7)
+        h7 = self.flatten(h7)
+
+        pos = torch.cat((h3, h5, h7), dim=-1)
         pos = F.relu(self.linear1(pos))
         pos = self.linear2(pos)
         pos = torch.reshape(pos, (x.shape[0], x.shape[1], -1))
-        return torch.cat((h, pos), dim=-1)
+        return pos
 
 class SequenceModel(nn.Module):
     def __init__(self, in_dim, hidden_dim, num_notes):
@@ -348,16 +362,16 @@ class SequenceModel(nn.Module):
             lstm_out, (h_n, c_n) = self.lstm(x, (h_0, c_0))
         y_hat = self.linear(lstm_out)
         return y_hat, (h_n, c_n)
-
-class EncodeDecode(nn.Module):
-    def __init__(self, edge_index, edge_attr, num_notes, en_in_dim, en_num_layers, en_emb_dim, en_out_dim, first_channel, second_channel, pos_emb_dim, pos_out_dim, de_emb_dim):
+        
+class ConvSequence(nn.Module):
+    def __init__(self, num_notes, first_channel, second_channel, conv_emb_dim, conv_out_dim, seq_emb_dim):
         super().__init__()
-        self.encoder = EncoderModel(edge_index, edge_attr, en_in_dim, en_num_layers, num_notes, en_emb_dim, en_out_dim, first_channel, second_channel, pos_emb_dim, pos_out_dim)
-        self.decoder = SequenceModel(en_out_dim + pos_out_dim, de_emb_dim, num_notes)
+        self.conv_model = ConvModel(num_notes, first_channel, second_channel, conv_emb_dim, conv_out_dim)
+        self.sequence_model = SequenceModel(conv_out_dim, seq_emb_dim, num_notes)
 
     def forward(self, x, h_0=None, c_0=None):
-        h = self.encoder(x)
-        out, (h_n, c_n) = self.decoder(h, h_0, c_0)
+        h = self.conv_model(x)
+        out, (h_n, c_n) = self.sequence_model(h, h_0, c_0)
         return out, (h_n, c_n)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -446,9 +460,9 @@ def generate_music(model, seed, timesteps, max_notes=6):
 
 # defining model and loading weights to it.
 def model_fn(model_dir):
-    edge_index = create_tonnetz_adjacency_matrix(NUM_NOTES)
-    edge_attr = create_tonnetz_edge_attr(edge_index)
-    model = EncodeDecode(edge_index, edge_attr, num_notes=NUM_NOTES, en_in_dim=1, en_num_layers=2, en_emb_dim=8, en_out_dim=8, first_channel=8, second_channel=32, pos_emb_dim=128, pos_out_dim=64, de_emb_dim=256)
+    #edge_index = create_tonnetz_adjacency_matrix(NUM_NOTES)
+    #edge_attr = create_tonnetz_edge_attr(edge_index)
+    model = ConvSequence(num_notes=64, first_channel=8, second_channel=32, conv_emb_dim=512, conv_out_dim=128, seq_emb_dim=512)
     with open(os.path.join(model_dir, "model.pth"), "rb") as f:
         model.load_state_dict(torch.load(f, map_location=torch.device('cpu')))
     model.to(device).eval()

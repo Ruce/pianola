@@ -130,8 +130,6 @@ class Piano {
 			clearInterval(this.listenerIntervalId);
 			
 			// Rewind the transport schedule to the last of the seed input so that the history fed to the model is seamless
-			// Also, slice off last notes that are in the buffer period and add it to the model's buffer history
-			
 			// Subtract twice the buffer duration from the last seed input because callModel and generateNotes each adds a buffer
 			this.callModelEnd = Tone.Time(this.lastSeedInputPosition).toTicks() - (2 * this.bufferTicks);
 			const newPosition = Tone.Time(this.lastSeedInputPosition).toSeconds() - Tone.Time(`0:${this.bufferBeats}`).toSeconds();
