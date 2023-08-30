@@ -32,9 +32,17 @@ class NotesCanvas {
 		this.triggerAnimation();
 	}
 	
-	addNoteBar(pianoKey, currTime, isPlayedByUser) {
+	static get barFill() {
+		return {
+			player: { white: '#FDFD66', black: '#FFBF00', shadow: 'yellow'},
+			model: { white: '#BEFCFF', black: '#5EBBBF', shadow: '#7DF9FF'},
+			bot: { white: '#C6FEE2', black: '#59DD9C', shadow: '#79FDBC'}
+		};
+	}
+	
+	addNoteBar(pianoKey, currTime, actor) {
 		const x = this.piano.pianoCanvas.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
-		this.activeBars.push({startTime: currTime, x: x, isWhiteKey: pianoKey.isWhiteKey, isPlayedByUser: isPlayedByUser});
+		this.activeBars.push({startTime: currTime, x: x, isWhiteKey: pianoKey.isWhiteKey, actor: actor});
 		
 		if (!this.animationActive) {
 			this.animationActive = true;
@@ -53,7 +61,7 @@ class NotesCanvas {
 		ctx.fillStyle = '#222222';
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		
-		// Placeholder square to see if animations are fired
+		// Debug placeholder square to see if animations are fired
 		//ctx.fillStyle = 'red';
 		//ctx.fillRect(0, new Date().getMilliseconds() / 10, 10, 10);
 		
@@ -68,14 +76,16 @@ class NotesCanvas {
 				const rectY = this.canvas.height - ((currTime - n.startTime) * this.canvas.height / 3000);
 				const noteWidth = n.isWhiteKey ? this.piano.pianoCanvas.whiteKeyWidth : this.piano.pianoCanvas.blackKeyWidth;
 				
-				if (n.isPlayedByUser) {
-					ctx.fillStyle = n.isWhiteKey ? '#FDFD66' : '#FFBF00';
-					ctx.shadowColor = 'yellow';
-				} else {
-					ctx.fillStyle = n.isWhiteKey ? '#BEFCFF' : '#5EBBBF';
-					ctx.shadowColor = '#7DF9FF';
+				if (n.actor === Actor.Player) {
+					ctx.fillStyle = n.isWhiteKey ? NotesCanvas.barFill.player.white : NotesCanvas.barFill.player.black;
+					ctx.shadowColor = NotesCanvas.barFill.player.shadow;
+				} else if (n.actor === Actor.Bot) {
+					ctx.fillStyle = n.isWhiteKey ? NotesCanvas.barFill.bot.white : NotesCanvas.barFill.bot.black;
+					ctx.shadowColor = NotesCanvas.barFill.bot.shadow;
+				} else if (n.actor === Actor.Model) {
+					ctx.fillStyle = n.isWhiteKey ? NotesCanvas.barFill.model.white : NotesCanvas.barFill.model.black;
+					ctx.shadowColor = NotesCanvas.barFill.model.shadow;
 				}
-				//ctx.fillRect(n.x, rectY, noteWidth, rectHeight);
 				ctx.beginPath();
 				ctx.roundRect(n.x, rectY, noteWidth, rectHeight, 3);
 				ctx.fill();

@@ -38,7 +38,7 @@ canvas {
 }
 
 #stopMusic:hover {
-  background-color: red;
+  background-color: #A04040;
 }
 
 .playExample {
@@ -51,6 +51,10 @@ canvas {
   text-align: left;
   font-size: 10px;
   cursor: pointer;
+}
+
+.playExample:hover {
+  background-color: #40A040;
 }
 
 #playExample1 {

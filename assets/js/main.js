@@ -1,5 +1,6 @@
 ---
 ---
+{% include_relative actor.js %}
 {% include_relative model.js %}
 {% include_relative piano.js %}
 {% include_relative notes.js %}
