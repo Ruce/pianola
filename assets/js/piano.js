@@ -18,7 +18,8 @@ class Piano {
 		this.bufferBeats = 2;
 		this.bufferTicks = Tone.Time(`0:${this.bufferBeats}`).toTicks();
 		this.historyWindowBeats = 16;
-		this.setBPM(88);
+		this.defaultBPM = 88;
+		this.setBPM(this.defaultBPM);
 	}
 	
 	static createPianoKeys(octaves) {
@@ -42,7 +43,7 @@ class Piano {
 	
 	playNote(pianoKey, time, transportPosition=Tone.Transport.position) {
 		const currTime = new Date();
-		this.sampler.triggerAttackRelease(pianoKey.keyName, 0.25, time);
+		this.sampler.triggerAttackRelease(pianoKey.keyName, 0.3, time);
 		
 		const isPlayer = (typeof time === 'undefined');
 		const endTime = new Date(currTime);
@@ -61,13 +62,13 @@ class Piano {
 		Tone.Transport.scheduleOnce((time) => this.playNote(pianoKey, time, triggerTime), triggerTime);
 	}
 	
-	async callModel() {
+	async callModel(customHistory) {
 		// From previous time the model was called, add buffer duration to get new interval for querying
 		this.callModelEnd += this.bufferTicks;
 		//const start = Math.max(0, this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks());
 		const start = this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks() + 1;
-		const recentHistory = Note.getRecentHistory(this.noteHistory, start);
-		const generated = await this.model.generateNotes(recentHistory, start, this.callModelEnd, this.bufferTicks);
+		const history = typeof customHistory !== 'undefined' ? customHistory : Note.getRecentHistory(this.noteHistory, start);
+		const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.bufferTicks);
 		
 		// Check if the model is still active (i.e. hasn't been stopped) before scheduling notes
 		if (this.isCallingModel) {
@@ -85,10 +86,10 @@ class Piano {
 		}
 	}
 	
-	startCallModel() {
+	startCallModel(customHistory) {
 		if (!this.isCallingModel) {
 			this.isCallingModel = true;
-			this.callModel(); // Call model immediately, since setInterval first triggers function after the delay
+			this.callModel(customHistory); // Call model immediately, since setInterval first triggers function after the delay
 			this.callModelIntervalId = setInterval(() => this.callModel(), this.callModelSeconds*1000);
 			this.checkActivityIntervalId = setInterval(() => this.checkActivity(), 5000);
 		}
@@ -103,6 +104,7 @@ class Piano {
 		Tone.Transport.cancel();
 		Tone.Transport.stop();
 		this.toneStarted = false;
+		this.setBPM(this.defaultBPM);
 		
 		if (typeof this.callModelIntervalId !== 'undefined') {
 			clearInterval(this.callModelIntervalId);
@@ -140,6 +142,24 @@ class Piano {
 			this.startCallModel();
 			document.getElementById("listener").style.visibility = "hidden";
 		}
+	}
+	
+	playExample(data, bpm) {
+		this.setBPM(bpm);
+		this.startTone();
+		
+		let lastNoteTick = 0;
+		const startPosition = Tone.Time(Tone.Transport.position).toTicks();
+		const notes = PianolaModel.parseNotes(data, startPosition);
+		for (const note of notes) {
+			this.scheduleNote(this.pianoKeys[note.keyNum], note.position);
+			lastNoteTick = Tone.Time(note.position).toTicks();
+		}
+		
+		// Set the end position for the first model call to 2*bufferTicks before last note because callModel and generateNotes each adds a buffer
+		// Then schedule startCallModel to trigger one bufferTick before the last note
+		this.callModelEnd = lastNoteTick - (2 * this.bufferTicks);
+		Tone.Transport.scheduleOnce(() => this.startCallModel(notes), this.callModelEnd + this.bufferTicks + "i");
 	}
 	
 	initialiseSampler() {

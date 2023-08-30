@@ -41,6 +41,33 @@ canvas {
   background-color: red;
 }
 
+.playExample {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+  color: white;
+  background-color: green;
+  text-align: left;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+#playExample1 {
+  top: 90px;
+  right: 25px;
+}
+
+#playExample2 {
+  top: 140px;
+  right: 25px;
+}
+
+#playExample3 {
+  top: 190px;
+  right: 25px;
+}
+
 .listener {
   position: absolute;
   top: 20px;

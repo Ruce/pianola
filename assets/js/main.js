@@ -6,11 +6,12 @@
 
 
 const octaves = 5;
+const endpointBaseUrl = 'https://vcnf5f6zo2.execute-api.eu-west-2.amazonaws.com/beta/next-notes?';
 
 var piano;
 var notesCanvas;
+var exampleSongs;
 var globalMouseDown = false;
-var endpointBaseUrl = 'https://vcnf5f6zo2.execute-api.eu-west-2.amazonaws.com/beta/next-notes?';
 
 function hideLoader() {
 	document.getElementById('loaderCircle').classList.add('complete');
@@ -32,12 +33,27 @@ function redrawCanvases() {
 }
 
 function stopMusic() {
-	if (typeof piano !== 'undefind') {
+	if (typeof piano !== 'undefined') {
 		piano.stopCallModel();
 	}
 }
 
+function fetchSongExamples() {
+	fetch('assets/songs/examples.json')
+	.then(response => response.json())
+	.then(data => exampleSongs = data)
+	.catch(error => {
+		console.log('Error reading song examples JSON:', error);
+	});
+}
+
+function playExample(exampleNum) {
+	const song = exampleSongs.songs[exampleNum-1];
+	piano.playExample(song.data, song.bpm);
+}
+
 document.addEventListener("DOMContentLoaded", initialisePage);
+document.addEventListener("DOMContentLoaded", fetchSongExamples);
 document.addEventListener("mouseup", () => globalMouseDown = false);
 
 var resizeTimeout = false;
