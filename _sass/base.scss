@@ -13,18 +13,78 @@ html, body {
   overflow: hidden;
 }
 
-.container {
-  display: block;
-  overflow: hidden;
-}
-
 canvas {
   margin: 0;
   padding: 0;
   vertical-align: top;
 }
 
-#stopMusic {
+.canvasContainer {
+  display: block;
+  overflow: hidden;
+}
+
+.menuContainer {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  height: 30px;
+  background-color: #4E4E4E;
+  opacity: 0.95;
+  border: grey 1px solid;
+  border-radius: 6px;
+  padding: 6px 6px;
+  display:flex;
+  align-items:center
+}
+
+.menuButton {
+  width: 30px;
+  height: 30px;
+  margin: 0 12px;
+  padding: 5px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.menuButton:hover {
+  background-color: #646464;
+}
+
+.menuButtonShape {
+  width: 80%;
+  height: 80%;
+  background-color: white;
+  margin: 2px;
+}
+
+.stopButtonShape {
+}
+
+.playButtonShape {
+  clip-path: polygon(0% 0%, 80% 50%, 0% 100%);
+  margin-left: 4px;
+}
+
+.volumeSlider {
+  margin: 0 12px;
+  width: 80px;
+  accent-color: white;
+  cursor: pointer;
+}
+
+.volumeSlider::-webkit-slider-runnable-track {
+  height: 6px;
+}
+
+.volumeSlider::-webkit-slider-thumb {
+  margin-top: -5px; /* Centers thumb on the track */
+}
+
+.stopMusic {
   position: absolute;
   top: 20px;
   right: 20px;
@@ -37,7 +97,7 @@ canvas {
   cursor: pointer;
 }
 
-#stopMusic:hover {
+.stopMusic:hover {
   background-color: #A04040;
 }
 
