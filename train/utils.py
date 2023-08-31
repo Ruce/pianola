@@ -4,6 +4,36 @@ import math
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch.utils.data import Dataset
+
+class MidiDataset(Dataset):
+  def __init__(self, tensors, source_size, sample_delta=1):
+    '''
+    `tensors`: list of tensors where each tensor is a song of shape (timesteps, notes)
+    `source_size`: number of timesteps for the source sequence
+    `sample_delta`: number of timesteps between each sample, i.e. overlapping samples if < source_size, gaps between samples if > source_size
+    '''
+    self.tensors = tensors
+    self.tensor_lengths = [len(t) for t in tensors]
+    self.source_size = source_size
+    self.sample_delta = sample_delta
+    # Calculate number of samples per tensor
+    self.tensor_samples = [max(0, ((n - 1 - self.source_size + self.sample_delta) // self.sample_delta)) for n in self.tensor_lengths]
+
+  def __len__(self):
+    return sum(self.tensor_samples)
+
+  def __getitem__(self, idx):
+    curr_sample_id = 0
+    for i, n in enumerate(self.tensor_samples):
+      if curr_sample_id + n > idx:
+        # This tensor contains the item we want
+        tensor = self.tensors[i]
+        start = (idx - curr_sample_id) * self.sample_delta
+        end = start + self.source_size
+        return tensor[start:end].unsqueeze(dim=-1), tensor[start+1:end+1]
+      else:
+        curr_sample_id += n
 
 class MidiUtil():
   def get_midi_timesteps(filename):
