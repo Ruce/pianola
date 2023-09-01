@@ -6,6 +6,8 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 class MidiDataset(Dataset):
   def __init__(self, tensors, source_size, sample_delta=1):
     '''
@@ -145,8 +147,8 @@ class MidiUtil():
     '''
     assert(end_note >= start_note)
     timesteps = tensor.shape[0]
-    low_notes = torch.zeros((timesteps, start_note))
-    high_notes = torch.zeros((timesteps, 127-end_note))
+    low_notes = torch.zeros((timesteps, start_note)).to(DEVICE)
+    high_notes = torch.zeros((timesteps, 127-end_note)).to(DEVICE)
     return torch.cat((low_notes, tensor, high_notes), dim=1)
 
   def slice_temporal_data(timestep_tensor, window_size):
