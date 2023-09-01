@@ -29,7 +29,7 @@ canvas {
   top: 10px;
   left: 50%;
   transform: translateX(-50%);
-  width: 200px;
+  width: 230px;
   height: 30px;
   background-color: #595959;
   opacity: 0.95;
@@ -54,23 +54,69 @@ canvas {
   background-color: #6E6E6E;
 }
 
+.playButton {
+  position: relative;
+  display: inline-block;
+}
+
+.exampleList {
+  position: absolute;
+  display: none;
+  background-color: #6E6E6E;
+  list-style: none;
+  min-width: 100px;
+  margin: 0;
+  padding: 0;
+  left: 0;
+  top: 30px;
+  opacity: 0;
+}
+
+.exampleList > li {
+  color: white;
+  font-size: 13px;
+  padding: 9px 8px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.exampleList > li:hover {
+  background-color: #555;
+}
+
+.playButton:hover > .exampleList,
+.exampleList:hover {
+  display: block;
+  opacity: 0.9;
+}
+
 .menuButtonShape {
   width: 80%;
   height: 80%;
-  background-color: #FEFEFE;
   margin: 2px;
 }
 
 .stopButtonShape {
+  background-color: #FEFEFE;
 }
 
 .playButtonShape {
+  background-color: #FEFEFE;
   clip-path: polygon(0% 0%, 80% 50%, 0% 100%);
-  margin-left: 4px;
+  margin-left: 5px;
+}
+
+.volumeButtonShape {
+  background-image: url('../img/volume-on.svg');
+  background-size: cover;
+}
+
+.volumeButtonOff {
+  background-image: url('../img/volume-off.svg');
 }
 
 .volumeSlider {
-  margin: 0 10px;
+  margin: 0 0 0 -10px;
   width: 75px;
   accent-color: #FEFEFE;
   cursor: pointer;
@@ -84,53 +130,6 @@ canvas {
   margin-top: -6px; /* Centers thumb on the track */
 }
 
-.stopMusic {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 2.5%;
-  min-width: 30px;
-  min-height: 30px;
-  padding: 0 0 2.5% 0;
-  border-width: 1px;
-  background-color: Maroon;
-  cursor: pointer;
-}
-
-.stopMusic:hover {
-  background-color: #A04040;
-}
-
-.playExample {
-  position: absolute;
-  width: 30px;
-  height: 30px;
-  clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
-  color: white;
-  background-color: green;
-  text-align: left;
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.playExample:hover {
-  background-color: #40A040;
-}
-
-#playExample1 {
-  top: 90px;
-  right: 25px;
-}
-
-#playExample2 {
-  top: 140px;
-  right: 25px;
-}
-
-#playExample3 {
-  top: 190px;
-  right: 25px;
-}
 
 .listener {
   position: absolute;

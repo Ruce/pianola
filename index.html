@@ -12,12 +12,17 @@ layout: default
 <div class="listener" id="listener"><p class="listenerText">Listening...</p></div>
 <div class="menuContainer">
 	<button class="menuButton" onclick="stopMusic()"><div class="menuButtonShape stopButtonShape"></div></button>
-	<button class="menuButton"><div class="menuButtonShape playButtonShape"></div></button>
+	<button class="menuButton playButton">
+		<div class="menuButtonShape playButtonShape"></div>
+		<ul class="exampleList">
+			<li onclick="playExample(1)">Song I</li>
+			<li onclick="playExample(2)">Song II</li>
+			<li onclick="playExample(3)">Song III</li>
+		</ul>
+	</button>
+	<button class="menuButton" onclick="toggleMute()"><div class="menuButtonShape volumeButtonShape" id="volumeButtonImage"></div></button>
 	<input type="range" class="volumeSlider" id="volumeSlider" min="0" max="100" value="85">
 </div>
-<button class="playExample" id="playExample1" onclick="playExample(1)">1</button>
-<button class="playExample" id="playExample2" onclick="playExample(2)">2</button>
-<button class="playExample" id="playExample3" onclick="playExample(3)">3</button>
 <div id="canvasContainer" class="canvasContainer">
 	<canvas id="notesCanvas"></canvas><canvas id="pianoCanvas"></canvas>
 </div>

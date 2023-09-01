@@ -34,12 +34,42 @@ function redrawCanvases() {
 	notesCanvas.draw();
 }
 
+var previousVolume = 0;
 function initialiseVolumeSlider() {
 	const slider = document.getElementById('volumeSlider');
-	piano.changeVolume(slider.value);
+	previousVolume = Math.round(slider.value);
+	piano.changeVolume(previousVolume);
+	
 	slider.addEventListener("input", (event) => {
-		piano.changeVolume(event.target.value);
+		const newVolume = Math.round(event.target.value);
+		previousVolume = newVolume;
+		piano.changeVolume(newVolume);
+		
+		// Change the speaker icon to on or off if necessary
+		const volumeButtonImage = document.getElementById('volumeButtonImage');
+		if (newVolume === 0 && !volumeButtonImage.classList.contains('volumeButtonOff')) {
+			volumeButtonImage.classList.add('volumeButtonOff');
+		} else if (newVolume > 0 && volumeButtonImage.classList.contains('volumeButtonOff')) {
+			volumeButtonImage.classList.remove('volumeButtonOff');
+		}
 	});
+}
+
+function toggleMute() {
+	const volumeSlider = document.getElementById('volumeSlider');
+	const volumeButtonImage = document.getElementById('volumeButtonImage');
+	const wasMuted = volumeButtonImage.classList.contains('volumeButtonOff');
+	if (wasMuted) {
+		volumeButtonImage.classList.remove('volumeButtonOff');
+		const newVolume = (previousVolume === 0) ? 15 : previousVolume;
+		previousVolume = newVolume;
+		volumeSlider.value = newVolume;
+		piano.changeVolume(newVolume);
+	} else {
+		volumeButtonImage.classList.add('volumeButtonOff');
+		volumeSlider.value = 0;
+		piano.changeVolume(0);
+	}
 }
 
 function stopMusic() {

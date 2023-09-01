@@ -147,6 +147,7 @@ class Piano {
 	}
 	
 	playExample(data, bpm) {
+		this.stopCallModel();
 		this.setBPM(bpm);
 		this.startTone();
 		this.lastActivity = new Date();
@@ -167,7 +168,6 @@ class Piano {
 	
 	changeVolume(volume) {
 		const volumeDb = (volume < 1) ? -Infinity : -(40 - (volume/3));
-		console.log(volume, 'setting volumeDb', volumeDb);
 		this.sampler.volume.value = volumeDb;
 	}
 	
