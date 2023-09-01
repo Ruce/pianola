@@ -349,35 +349,25 @@ class ConvModel(nn.Module):
         pos = torch.reshape(pos, (x.shape[0], x.shape[1], -1))
         return pos
 
-class SequenceModel(nn.Module):
-    def __init__(self, in_dim, hidden_dim, num_notes):
-        super().__init__()
-        self.lstm = nn.LSTM(in_dim, hidden_dim, batch_first=True)
-        self.linear = nn.Linear(hidden_dim, num_notes)
-
-    def forward(self, x, h_0=None, c_0=None):
-        if h_0 is None or c_0 is None:
-            lstm_out, (h_n, c_n) = self.lstm(x)
-        else:
-            lstm_out, (h_n, c_n) = self.lstm(x, (h_0, c_0))
-        y_hat = self.linear(lstm_out)
-        return y_hat, (h_n, c_n)
-        
-class ConvSequence(nn.Module):
-    def __init__(self, num_notes, first_channel, second_channel, conv_emb_dim, conv_out_dim, seq_emb_dim):
+class ConvDecoder(nn.Module):
+    def __init__(self, num_notes, first_channel, second_channel, conv_emb_dim, conv_out_dim, ff_dim, nhead, num_layers, norm_first):
         super().__init__()
         self.conv_model = ConvModel(num_notes, first_channel, second_channel, conv_emb_dim, conv_out_dim)
-        self.sequence_model = SequenceModel(conv_out_dim, seq_emb_dim, num_notes)
-
-    def forward(self, x, h_0=None, c_0=None):
-        h = self.conv_model(x)
-        out, (h_n, c_n) = self.sequence_model(h, h_0, c_0)
-        return out, (h_n, c_n)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=conv_out_dim, dim_feedforward=ff_dim, nhead=nhead, norm_first=norm_first, activation='gelu', batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.linear = nn.Linear(conv_out_dim, num_notes)
+  
+    def forward(self, source):
+        src = self.conv_model(source)
+        causal_mask = torch.nn.Transformer.generate_square_subsequent_mask(src.shape[1]).to(device) # Sequence length
+        out = self.transformer_encoder(src, mask=causal_mask, is_causal=True)
+        pred = self.linear(out)
+        return pred
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 NUM_NOTES = 64
-WINDOW_SIZE = 64
+WINDOW_SIZE = 128
 NEIGHBOUR_DISTANCES = [-7, -4, -3, 3, 4, 7]
 NOTES_DELIMITER = ','
 TICKS_DELIMITER = ';'
@@ -441,28 +431,26 @@ def decode_tensor(y_hat, max_notes):
 
 def generate_music(model, seed, timesteps, max_notes=6):
     # Input `seed` and output shapes: (timesteps, num_notes)
-    # For conv-sequence model, expected input shape is (batch_size, timesteps, num_notes, 1)
-    generated = seed.unsqueeze(dim=0).unsqueeze(dim=-1)
-    window_size = generated.shape[1]
+    # For convolutional models, expected input shape is (batch_size, timesteps, num_notes, 1)
+    source = seed.unsqueeze(dim=0).unsqueeze(dim=-1)
+    generated = []
 
     model.eval()
     with torch.no_grad():
-        h_n, c_n = (None, None)
         for i in range(timesteps):
-            if i == 0:
-                pred, (h_n, c_n) = model(generated[:, -window_size:])
-            else:
-                pred, (h_n, c_n) = model(generated[:, -1:], h_n, c_n)
+            pred = model(source)
             y_hat = torch.sigmoid(pred[:, -1]).squeeze(dim=0) # Keep only the last timestep and remove batch_size dimension
             new_notes = decode_tensor(y_hat, max_notes) # Decode probabilities in y_hat
-            generated = torch.cat((generated, new_notes.reshape((1, 1, -1, 1))), dim=1)
-    return generated[0, -timesteps:].squeeze(dim=-1) # Remove batch_size and node_features dimensions
+            generated.append(new_notes)
+            source = torch.cat((source, new_notes.reshape((1, 1, -1, 1))), dim=1)
+            source = source[:, -WINDOW_SIZE:]
+    return torch.stack(generated)
 
 # defining model and loading weights to it.
 def model_fn(model_dir):
     #edge_index = create_tonnetz_adjacency_matrix(NUM_NOTES)
     #edge_attr = create_tonnetz_edge_attr(edge_index)
-    model = ConvSequence(num_notes=64, first_channel=8, second_channel=32, conv_emb_dim=512, conv_out_dim=128, seq_emb_dim=512)
+    model = ConvDecoder(NUM_NOTES, first_channel=8, second_channel=32, conv_emb_dim=512, conv_out_dim=128, ff_dim=2048, nhead=8, num_layers=8, norm_first=True)
     with open(os.path.join(model_dir, "model.pth"), "rb") as f:
         model.load_state_dict(torch.load(f, map_location=torch.device('cpu')))
     model.to(device).eval()
@@ -482,9 +470,8 @@ def input_fn(request_body, request_content_type):
 # inference
 def predict_fn(input_object, model):
     timesteps = int(input_object['timesteps'])
-    # Pad or trim input_object['data'] tensor to the correct WINDOW_SIZE
-    padding = torch.zeros((WINDOW_SIZE, NUM_NOTES))
-    seed = torch.cat((padding, input_object['data']), dim=0)[-WINDOW_SIZE:]
+    # Trim input_object['data'] tensor to a maximum length of WINDOW_SIZE
+    seed = input_object['data'][-WINDOW_SIZE:]
     prediction = generate_music(model, seed, timesteps)
     return prediction
 

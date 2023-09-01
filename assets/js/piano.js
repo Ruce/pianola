@@ -15,9 +15,9 @@ class Piano {
 		this.noteHistory = [];
 		this.lastActivity = new Date();
 		
-		this.bufferBeats = 2;
+		this.bufferBeats = 4;
 		this.bufferTicks = Tone.Time(`0:${this.bufferBeats}`).toTicks();
-		this.historyWindowBeats = 16;
+		this.historyWindowBeats = 32;
 		this.defaultBPM = 88;
 		this.setBPM(this.defaultBPM);
 	}
@@ -64,8 +64,9 @@ class Piano {
 	async callModel(customHistory) {
 		// From previous time the model was called, add buffer duration to get new interval for querying
 		this.callModelEnd += this.bufferTicks;
-		//const start = Math.max(0, this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks());
-		const start = this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks() + 1;
+		const start = Math.max(0, this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks() + 1);
+		// const start = this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks() + 1;
+		
 		const history = typeof customHistory !== 'undefined' ? customHistory : Note.getRecentHistory(this.noteHistory, start);
 		const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.bufferTicks);
 		
@@ -98,6 +99,8 @@ class Piano {
 		this.isCallingModel = false;
 		this.awaitingPlayerInput = true;
 		this.lastSeedInputPosition = null;
+		this.callModelInitial = null;
+		
 		this.noteHistory = [];
 		this.model.noteHistory = [];
 		Tone.Transport.cancel();
@@ -146,6 +149,7 @@ class Piano {
 	playExample(data, bpm) {
 		this.setBPM(bpm);
 		this.startTone();
+		this.lastActivity = new Date();
 		
 		let lastNoteTick = 0;
 		const startPosition = Tone.Time(Tone.Transport.position).toTicks();
