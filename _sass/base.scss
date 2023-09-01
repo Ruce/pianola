@@ -29,9 +29,9 @@ canvas {
   top: 10px;
   left: 50%;
   transform: translateX(-50%);
-  width: 220px;
+  width: 200px;
   height: 30px;
-  background-color: #4E4E4E;
+  background-color: #595959;
   opacity: 0.95;
   border: grey 1px solid;
   border-radius: 6px;
@@ -43,7 +43,7 @@ canvas {
 .menuButton {
   width: 30px;
   height: 30px;
-  margin: 0 12px;
+  margin: 0 10px;
   padding: 5px;
   border: none;
   background: transparent;
@@ -51,13 +51,13 @@ canvas {
 }
 
 .menuButton:hover {
-  background-color: #646464;
+  background-color: #6E6E6E;
 }
 
 .menuButtonShape {
   width: 80%;
   height: 80%;
-  background-color: white;
+  background-color: #FEFEFE;
   margin: 2px;
 }
 
@@ -70,18 +70,18 @@ canvas {
 }
 
 .volumeSlider {
-  margin: 0 12px;
-  width: 80px;
-  accent-color: white;
+  margin: 0 10px;
+  width: 75px;
+  accent-color: #FEFEFE;
   cursor: pointer;
 }
 
 .volumeSlider::-webkit-slider-runnable-track {
-  height: 6px;
+  height: 4px;
 }
 
 .volumeSlider::-webkit-slider-thumb {
-  margin-top: -5px; /* Centers thumb on the track */
+  margin-top: -6px; /* Centers thumb on the track */
 }
 
 .stopMusic {
@@ -151,9 +151,8 @@ canvas {
 .loaderContainer{
   position: absolute;
   top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
+  left: 20px;
+  text-align: left;
 }
 
 .loaderText {

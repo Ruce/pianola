@@ -26,11 +26,20 @@ function initialisePage() {
 	model.connectToModel(hideLoader);
 	piano = new Piano('pianoCanvas', octaves, model);
 	notesCanvas = new NotesCanvas('notesCanvas', piano);
+	initialiseVolumeSlider();
 }
 
 function redrawCanvases() {
 	piano.pianoCanvas.triggerDraw();
 	notesCanvas.draw();
+}
+
+function initialiseVolumeSlider() {
+	const slider = document.getElementById('volumeSlider');
+	piano.changeVolume(slider.value);
+	slider.addEventListener("input", (event) => {
+		piano.changeVolume(event.target.value);
+	});
 }
 
 function stopMusic() {

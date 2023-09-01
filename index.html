@@ -11,11 +11,10 @@ layout: default
 </div>
 <div class="listener" id="listener"><p class="listenerText">Listening...</p></div>
 <div class="menuContainer">
-	<button class="menuButton"><div class="menuButtonShape stopButtonShape"></div></button>
+	<button class="menuButton" onclick="stopMusic()"><div class="menuButtonShape stopButtonShape"></div></button>
 	<button class="menuButton"><div class="menuButtonShape playButtonShape"></div></button>
-	<input type="range" class="volumeSlider" min="0" max="100" value="80">
+	<input type="range" class="volumeSlider" id="volumeSlider" min="0" max="100" value="85">
 </div>
-<button class="stopMusic" id="stopMusic" onclick="stopMusic()"></button>
 <button class="playExample" id="playExample1" onclick="playExample(1)">1</button>
 <button class="playExample" id="playExample2" onclick="playExample(2)">2</button>
 <button class="playExample" id="playExample3" onclick="playExample(3)">3</button>

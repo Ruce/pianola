@@ -165,6 +165,12 @@ class Piano {
 		Tone.Transport.scheduleOnce(() => this.startCallModel(notes), this.callModelEnd + this.bufferTicks + "i");
 	}
 	
+	changeVolume(volume) {
+		const volumeDb = (volume < 1) ? -Infinity : -(40 - (volume/3));
+		console.log(volume, 'setting volumeDb', volumeDb);
+		this.sampler.volume.value = volumeDb;
+	}
+	
 	initialiseSampler() {
 		const noteKeys = this.pianoKeys.map((k) => k.keyName); // Get a list of all notes e.g. ['A3', 'A#3', 'B3', 'C4'...]
 		const sampleFiles = Object.assign({}, ...noteKeys.map((n) => ({[n]: n.replace('#', 's') + ".mp3"})));
@@ -177,7 +183,7 @@ class Piano {
 			urls: sampleFiles,
 			baseUrl: "assets/samples/piano/",
 			release: 0.5,
-			volume: -6
+			volume: -8
 		}).toDestination();
 		
 		return sampler;
