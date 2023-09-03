@@ -51,7 +51,7 @@ class MidiUtil():
       timesteps = max(timesteps, track_timesteps)
     return timesteps
 
-  def midi_to_opo_tensor(filename, binary_velocity=True):
+  def midi_to_opo_tensor(filename):
     mid = mido.MidiFile(filename)
 
     # Three types of MIDI files (0, 1, 2)
@@ -60,7 +60,7 @@ class MidiUtil():
     assert(mid.type == 1)
     
     max_timesteps = MidiUtil.get_midi_timesteps(filename)
-    tensor = np.zeros((max_timesteps+1, NUM_NOTES))
+    tensor = np.zeros((max_timesteps+1, 128)) # 128 notes as in MIDI specifications
     tracks = [mid.tracks[1]]
     if len(mid.tracks) > 2:
       tracks.append(mid.tracks[2])
