@@ -40,11 +40,9 @@ class MidiDataset(Dataset):
 class MidiUtil():
   def get_midi_timesteps(filename):
     midi = mido.MidiFile(filename)
+    assert midi.type == 0 or midi.type == 1, "Type 2 MIDI files are not supported"
     timesteps = 0
-    tracks = [midi.tracks[1]]
-    if len(midi.tracks) == 3:
-      tracks.append(midi.tracks[2])
-    for track in tracks:
+    for track in midi.tracks:
       track_timesteps = 0
       for msg in track:
         track_timesteps += msg.time
@@ -52,19 +50,16 @@ class MidiUtil():
     return timesteps
 
   def midi_to_opo_tensor(filename):
-    mid = mido.MidiFile(filename)
+    midi = mido.MidiFile(filename)
 
     # Three types of MIDI files (0, 1, 2)
-    # This function works with type 1 only and smooshes all tracks into one
+    # This function works with types 0 and 1 only, and smooshes all tracks into one
     # https://mido.readthedocs.io/en/stable/files/midi.html#file-types
-    assert(mid.type == 1)
+    assert midi.type == 0 or midi.type == 1, "Type 2 MIDI files are not supported"
     
     max_timesteps = MidiUtil.get_midi_timesteps(filename)
     tensor = np.zeros((max_timesteps+1, 128)) # 128 notes as in MIDI specifications
-    tracks = [mid.tracks[1]]
-    if len(mid.tracks) > 2:
-      tracks.append(mid.tracks[2])
-    for track in tracks:
+    for track in midi.tracks:
       timesteps = 0
       for msg in track:
         timesteps += msg.time
