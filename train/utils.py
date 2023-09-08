@@ -32,7 +32,6 @@ class MidiDataset(Dataset):
     curr_sample_id = 0
     random.seed(idx) # Set the seed according to idx for replicability
     note_shift = random.choice(self.note_shifts)
-    print(note_shift)
 
     for i, n in enumerate(self.tensor_samples):
       curr_sample_id += n
