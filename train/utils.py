@@ -9,33 +9,48 @@ from torch.utils.data import Dataset
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class MidiDataset(Dataset):
-  def __init__(self, tensors, source_size, sample_delta=1):
+  def __init__(self, tensors, source_size, sample_delta=1, note_shift=0):
     '''
     `tensors`: list of tensors where each tensor is a song of shape (timesteps, notes)
     `source_size`: number of timesteps for the source sequence
     `sample_delta`: number of timesteps between each sample, i.e. overlapping samples if < source_size, gaps between samples if > source_size
+    `note_shift`: randomly shift the notes up or down by this amount in order to augment data. Results in some data loss as tensors will padded and trimmed
     '''
     self.tensors = tensors
     self.tensor_lengths = [len(t) for t in tensors]
     self.source_size = source_size
     self.sample_delta = sample_delta
+    self.note_shifts = list(range(-note_shift, note_shift+1))
     # Calculate number of samples per tensor
-    self.tensor_samples = [max(0, ((n - 1 - self.source_size + self.sample_delta) // self.sample_delta)) for n in self.tensor_lengths]
+    self.tensor_samples = [max(0, ((n - self.source_size - 1) // self.sample_delta) + 1) for n in self.tensor_lengths]
 
   def __len__(self):
     return sum(self.tensor_samples)
 
   def __getitem__(self, idx):
     curr_sample_id = 0
+    random.seed(idx) # Set the seed according to idx for replicability
+    note_shift = random.choice(self.note_shifts)
+    print(note_shift)
+
     for i, n in enumerate(self.tensor_samples):
-      if curr_sample_id + n > idx:
+      curr_sample_id += n
+      if curr_sample_id > idx:
         # This tensor contains the item we want
         tensor = self.tensors[i]
-        start = (idx - curr_sample_id) * self.sample_delta
+
+        # Which window in this sample contains the item we want?
+        window_idx = idx - (curr_sample_id - n)
+        start = window_idx * self.sample_delta
         end = start + self.source_size
+
+        if note_shift > 0:
+          tensor = F.pad(tensor, (note_shift, 0))
+          tensor = tensor[:, :-note_shift]
+        elif note_shift < 0:
+          tensor = F.pad(tensor, (0, abs(note_shift)))
+          tensor = tensor[:, abs(note_shift):]
         return tensor[start:end].unsqueeze(dim=-1), tensor[start+1:end+1]
-      else:
-        curr_sample_id += n
 
 class MidiUtil():
   def get_midi_timesteps(filename):
