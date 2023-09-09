@@ -64,8 +64,10 @@ class Piano {
 	async callModel(customHistory) {
 		// From previous time the model was called, add buffer duration to get new interval for querying
 		this.callModelEnd += this.bufferTicks;
-		const start = Math.max(0, this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks() + 1);
-		// const start = this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks() + 1;
+		
+		 // Since buffer will be added to the history that is sent to the model, shorten the "played history" window by `bufferBeats`
+		const recentBeats = this.historyWindowBeats - this.bufferBeats;
+		const start = Math.max(0, this.callModelEnd - Tone.Time(`0:${recentBeats}`).toTicks() + 1);
 		
 		const history = typeof customHistory !== 'undefined' ? customHistory : Note.getRecentHistory(this.noteHistory, start);	
 		const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.bufferTicks);
