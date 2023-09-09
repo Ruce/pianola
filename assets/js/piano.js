@@ -17,7 +17,7 @@ class Piano {
 		
 		this.bufferBeats = 4;
 		this.bufferTicks = Tone.Time(`0:${this.bufferBeats}`).toTicks();
-		this.historyWindowBeats = 32;
+		this.historyWindowBeats = 28;
 		this.defaultBPM = 88;
 		this.setBPM(this.defaultBPM);
 	}
