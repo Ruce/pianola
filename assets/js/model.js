@@ -10,7 +10,7 @@ class PianolaModel {
 		for (let i=0; i < notesSlices.length; i++) {
 			let s = notesSlices[i];
 			if (s.length > 0) {
-				const genPosition = (basePositionTick + (i+1)*48) + "i";
+				const genPosition = (basePositionTick + i*48) + "i";
 				const notes = s.split(',');
 				for (const n of notes) {
 					generated.push(new Note(parseInt(n), genPosition));
@@ -38,16 +38,20 @@ class PianolaModel {
 	
 	async queryModel(queryString) {
 		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString, timesteps: 16});
-		const response = await fetch(endpointURI);
-		const data = await response.json();
-		return data;
+		try {
+			const response = await fetch(endpointURI);
+			const data = await response.json();
+			return data;
+		} catch (error) {
+			console.log('Error connecting to endpoint:', error);
+		}
 	}
 	
 	async connectToModel(callback) {
 		const data = await this.queryModel(";");
 		console.log('Data:', data);
 		
-		if (!data.hasOwnProperty('message')) {
+		if (typeof data !== 'undefined' && !data.hasOwnProperty('message')) {
 			// Expected response received, trigger callback
 			callback();
 		} else {
@@ -77,7 +81,8 @@ class PianolaModel {
 		
 		var generated = [];
 		if (!data.hasOwnProperty('message')) {
-			generated = PianolaModel.parseNotes(data, end + buffer);
+			const newBasePosition = end + buffer + 48; // New notes will start 1 timestep (i.e. 48 ticks) after the end+buffer window
+			generated = PianolaModel.parseNotes(data, newBasePosition);
 		}
 		this.noteHistory.push(...generated);
 		return generated;

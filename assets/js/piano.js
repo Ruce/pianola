@@ -67,7 +67,7 @@ class Piano {
 		const start = Math.max(0, this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks() + 1);
 		// const start = this.callModelEnd - Tone.Time(`0:${this.historyWindowBeats}`).toTicks() + 1;
 		
-		const history = typeof customHistory !== 'undefined' ? customHistory : Note.getRecentHistory(this.noteHistory, start);
+		const history = typeof customHistory !== 'undefined' ? customHistory : Note.getRecentHistory(this.noteHistory, start);	
 		const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.bufferTicks);
 		
 		// Check if the model is still active (i.e. hasn't been stopped) before scheduling notes
@@ -163,7 +163,7 @@ class Piano {
 		// Set the end position for the first model call to 2*bufferTicks before last note because callModel and generateNotes each adds a buffer
 		// Then schedule startCallModel to trigger one bufferTick before the last note
 		this.callModelEnd = lastNoteTick - (2 * this.bufferTicks);
-		Tone.Transport.scheduleOnce(() => this.startCallModel(notes), this.callModelEnd + this.bufferTicks + "i");
+		Tone.Transport.scheduleOnce(() => this.startCallModel(notes), Math.max(0, (this.callModelEnd + this.bufferTicks)) + "i");
 	}
 	
 	changeVolume(volume) {
