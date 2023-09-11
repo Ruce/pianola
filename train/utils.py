@@ -81,6 +81,45 @@ class MidiUtil():
         if msg.type == 'note_on':
           tensor[timesteps, msg.note] = msg.velocity
     return torch.from_numpy(tensor)
+    
+  def midi_to_timed_tensor(filename):
+    '''
+      Returns a tensor of shape [timesteps, num_notes, 2], where the last dimension is (velocity, duration)
+    '''
+    midi = mido.MidiFile(filename)
+
+    # Three types of MIDI files (0, 1, 2)
+    # This function works with types 0 and 1 only, and smooshes all tracks into one
+    # https://mido.readthedocs.io/en/stable/files/midi.html#file-types
+    assert midi.type == 0 or midi.type == 1, "Type 2 MIDI files are not supported"
+    
+    max_timesteps = MidiUtil.get_midi_timesteps(filename)
+     # 128 notes as in MIDI specifications; last dimension is (velocity, duration)
+    output = np.zeros((max_timesteps, 128, 2))
+    for track in midi.tracks:
+      t = 0
+      notes_last_active = np.full((128), -1, dtype=int)
+      for msg in track:
+        t += msg.time
+        # Whether the note is turned on or off, record the duration since last activity
+        # Note are not guaranteed to be toggled, e.g. a note that is already on can be turned on again
+        if msg.type == 'note_on' or msg.type == 'note_off':
+          last_active = notes_last_active[msg.note] # Timestep when this note was most recently activated
+          if last_active != -1:
+            note_duration = t - last_active
+            output[last_active, msg.note, 1] = note_duration # Record the duration at the timestep it was activated
+          
+          if msg.type == 'note_on' and msg.velocity > 0:
+            output[t, msg.note, 0] = msg.velocity / 100
+            notes_last_active[msg.note] = t
+          else:
+            notes_last_active[msg.note] = -1
+      still_active = (notes_last_active != -1).nonzero()[0]
+      for idx in still_active:
+        last_active = notes_last_active[idx]
+        note_duration = t - last_active
+        output[last_active, idx, 1] = note_duration
+    return torch.from_numpy(output)
 
   def to_binary_velocity_tensor(tensor):
     return (tensor > 0).long()
@@ -92,7 +131,7 @@ class MidiUtil():
     compress_factor = math.ceil(compress_factor)
     return compress_factor
 
-  def compress_tensor(tensor, method, orig_tpb, desired_tpb=16):
+  def compress_tensor(tensor, method, orig_tpb, desired_tpb):
     '''
     Reduces the fidelity of the musical tensor, i.e. merge multiple timesteps into one step
 
@@ -120,6 +159,32 @@ class MidiUtil():
         compressed_vectors.append(torch.tensor((majority_nonzeroes).astype(int)))
       else:
         raise KeyError(f"Unknown method {method}")
+    return torch.stack(compressed_vectors)
+
+  def compress_timed_tensor(tensor, orig_tpb, desired_tpb):
+    '''
+    Reduces the fidelity of the musical tensor, i.e. merge multiple timesteps into one step
+
+    Args:
+      `tensor`: PyTorch tensor of shape (timesteps, num_notes)
+      `orig_tpb`: original ticks per beat of the input `tensor`
+      `desired_tpb`: desired ticks per beat for the tensor to be compressed to
+    '''
+    assert(len(tensor.shape) == 3)
+
+    compress_factor = MidiUtil.calculate_compress_factor(orig_tpb, desired_tpb)
+    compressed_vectors = []
+    length = tensor.shape[0]
+    for start in range(0, length, compress_factor):
+      end = min(start + compress_factor, length)
+      tensor_slice = tensor[start:end]
+      slice_velocities = tensor_slice[:, :, 0]
+      slice_durations = tensor_slice[:, :, 1]
+      values, indices = slice_durations.max(dim=0)
+      max_velocities = slice_velocities[indices, torch.arange(slice_velocities.shape[1])]
+      max_durations = values / compress_factor
+      compressed = torch.stack([max_velocities, max_durations], dim=1)
+      compressed_vectors.append(compressed)
     return torch.stack(compressed_vectors)
 
   def reduce_tensor(tensor, start_note, end_note):
