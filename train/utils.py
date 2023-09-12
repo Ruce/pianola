@@ -45,10 +45,12 @@ class MidiDataset(Dataset):
         end = start + self.source_size
 
         if note_shift > 0:
-          tensor = F.pad(tensor, (note_shift, 0))
+          padding = (note_shift, 0) if len(tensor.shape) == 2 else (0, 0, note_shift, 0)
+          tensor = F.pad(tensor, padding)
           tensor = tensor[:, :-note_shift]
         elif note_shift < 0:
-          tensor = F.pad(tensor, (0, abs(note_shift)))
+          padding = (0, abs(note_shift)) if len(tensor.shape) == 2 else (0, 0, 0, abs(note_shift))
+          tensor = F.pad(tensor, padding)
           tensor = tensor[:, abs(note_shift):]
         return tensor[start:end].unsqueeze(dim=-1), tensor[start+1:end+1]
 
@@ -204,10 +206,7 @@ class MidiUtil():
       `orig_tpb`: ticks per beat of the original/generated MIDI file
       `compressed_tpb`: ticks per beat used by the compressed `tensor`
     '''
-    compress_factor = orig_tpb / compressed_tpb
-    if compress_factor % 1.0 != 0.0:
-      logging.warning(f"compress_factor of {compress_factor} is not an integer, rounding up...")
-    compress_factor = math.ceil(compress_factor)
+    compress_factor = MidiUtil.calculate_compress_factor(orig_tpb, compressed_tpb)
     # "Stretch" out the tensor using Kronecker product
     return torch.kron(tensor, torch.ones((compress_factor, 1)))
 
@@ -216,14 +215,19 @@ class MidiUtil():
     Expands out a reduced tensor to include all 128 notes in the MIDI range
 
     Args:
-      `tensor`: PyTorch tensor of shape (timesteps, num_notes)
+      `tensor`: PyTorch tensor of shape (timesteps, num_notes, *)
       `start_note`: MIDI note that `tensor` starts from (integer in 0-127)
       `end_note`: MIDI note that `tensor` ends at (integer in 0-127)
     '''
     assert(end_note >= start_note)
-    timesteps = tensor.shape[0]
-    low_notes = torch.zeros((timesteps, start_note)).to(DEVICE)
-    high_notes = torch.zeros((timesteps, 127-end_note)).to(DEVICE)
+    tensor_shape = list(tensor.shape)
+    low_notes_shape = tensor_shape.copy()
+    low_notes_shape[1] = start_note
+    high_notes_shape = tensor_shape.copy()
+    high_notes_shape[1] = 127 - end_note
+
+    low_notes = torch.zeros(low_notes_shape).to(DEVICE)
+    high_notes = torch.zeros(high_notes_shape).to(DEVICE)
     return torch.cat((low_notes, tensor, high_notes), dim=1)
 
   def slice_temporal_data(timestep_tensor, window_size):
@@ -235,6 +239,35 @@ class MidiUtil():
     num_slices = len(timestep_tensor) - window_size
     notes_tensor = timestep_tensor.transpose(0, 1)
     return [[notes_tensor[:, i:i+window_size], notes_tensor[:, i+window_size]] for i in range(num_slices)]
+    
+  def opo_tensor_to_midi(tensor, filename, orig_tpb, compressed_tpb):
+    # Create a MIDI file
+    mid = mido.MidiFile()
+    mid.ticks_per_beat = orig_tpb
+    track = mido.MidiTrack()
+    mid.tracks.append(track)
+    track.append(mido.Message('program_change', program=1))
+
+    compress_factor = MidiUtil.calculate_compress_factor(orig_tpb, compressed_tpb)
+
+    prev_t = 0
+    for t in range(tensor.shape[0]):
+      notes = torch.nonzero(tensor[t], as_tuple=True)[0].tolist()
+      for i, n in enumerate(notes):
+        time_delta = (t - prev_t) * compress_factor if i == 0 else 0
+        new_message = mido.Message('note_on', note=n, velocity=100, time=time_delta)
+        track.append(new_message)
+
+      # Turn off the notes 1 timestep later
+      for i, n in enumerate(notes):
+        time_delta = compress_factor if i == 0 else 0
+        new_message = mido.Message('note_on', note=n, velocity=0, time=time_delta)
+        track.append(new_message)
+        prev_t = t+1 # Update prev_t to t+1 since the notes are turned off 1 timestep later
+
+    # Save the MIDI file
+    mid.save(filename)
+    return mid
 
 
 class TonnetzUtil():
