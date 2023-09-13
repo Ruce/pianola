@@ -162,6 +162,60 @@ class MidiUtil():
       else:
         raise KeyError(f"Unknown method {method}")
     return torch.stack(compressed_vectors)
+  
+  def calc_dispersion(window, interval):
+    deltas = [(t % interval) / interval for t in window] # Normalised distance between on-beats and note
+    return circvar(deltas, high=1)
+
+  def calc_best_interval(window, low, high):
+    # Interval ticks between 32nd notes
+    dispersions = np.array([MidiUtil.calc_dispersion(window, i) for i in range(low, high)])
+    best = dispersions.argmin() + low
+    return best
+
+  def get_timings_in_range(note_timings, start, end):
+    output = []
+    for t in note_timings:
+      if t >= start and t < end:
+        output.append(t)
+    return output
+  
+  def dynamic_compress_tensor(tensor, desired_tpb):
+    start_interval = 40
+    end_interval = 64
+    w = 1920 # Window range for each slice to be processed
+    min_notes_in_window = 12
+    max_dispersion_diff = 0.1
+    
+    note_timings = torch.nonzero(torch.sum(tensor, dim=1) != 0, as_tuple=True)[0].tolist()
+    start_w = 0
+    prev_best_int = None
+    compressed_vectors = []
+    while start_w < len(tensor):
+      end_w = start_w + w
+      timings = MidiUtil.get_timings_in_range(note_timings, start_w, end_w)
+      while len(timings) < min_notes_in_window and end_w < len(tensor):
+        end_w += w
+        timings = MidiUtil.get_timings_in_range(note_timings, start_w, end_w)
+      best_int = MidiUtil.calc_best_interval(timings, start_interval, end_interval)
+      
+      if best_int != prev_best_int and prev_best_int is not None:
+        best_dispersion = MidiUtil.calc_dispersion(timings, best_int)
+        for i in [0, -1, 1, -2, 2]:
+          alt_dispersion = MidiUtil.calc_dispersion(timings, prev_best_int + i)
+          if alt_dispersion - best_dispersion < max_dispersion_diff:
+            best_int = prev_best_int + i
+            break
+      
+      tpb = best_int * 8
+      compress_factor = MidiUtil.calculate_compress_factor(tpb, desired_tpb)
+      for start in range(start_w, min(end_w, len(tensor)), compress_factor):
+        end = start + compress_factor
+        tensor_slice = tensor[start:end, :]
+        compressed_vectors.append(tensor_slice.max(dim=0).values)
+      start_w = end
+      prev_best_int = best_int
+    return torch.stack(compressed_vectors)
 
   def compress_timed_tensor(tensor, orig_tpb, desired_tpb):
     '''
