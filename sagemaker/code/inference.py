@@ -11,48 +11,58 @@ from torch.nn import Linear, ReLU, Module, Sequential
 from transformers import LlamaConfig
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer, _make_causal_mask
 
-class ConvModel(nn.Module):
-    def __init__(self, num_notes, first_channel, second_channel, emb_dim, out_dim):
+class InceptionModel(nn.Module):
+    def __init__(self, num_notes):
         super().__init__()
-        self.conv3_1 = nn.Conv1d(1, first_channel, kernel_size=3, stride=1, padding=1)
-        self.conv3_2 = nn.Conv1d(first_channel, second_channel, kernel_size=3, stride=1, padding=1)
-        self.conv5_1 = nn.Conv1d(1, first_channel, kernel_size=5, stride=1, padding=2)
-        self.conv5_2 = nn.Conv1d(first_channel, second_channel, kernel_size=5, stride=1, padding=2)
-        self.conv7_1 = nn.Conv1d(1, first_channel, kernel_size=7, stride=1, padding=3)
-        self.conv7_2 = nn.Conv1d(first_channel, second_channel, kernel_size=7, stride=1, padding=3)
-        self.pool = nn.MaxPool1d(2)
+        self.conv1_1 = nn.Conv1d(1, 5, kernel_size=1, stride=1, padding=0)
+        self.conv3_1 = nn.Conv1d(1, 16, kernel_size=3, stride=1, padding=1)
+        self.conv5_1 = nn.Conv1d(1, 6, kernel_size=5, stride=1, padding=2)
+        self.conv7_1 = nn.Conv1d(1, 4, kernel_size=7, stride=1, padding=3)
+        self.maxpool_1 = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
+
+        self.maxpool_1_to_2 = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
+
+        self.conv1_2 = nn.Conv1d(32, 8, kernel_size=1, stride=1, padding=0)
+        self.conv3_2 = nn.Conv1d(32, 48, kernel_size=3, stride=1, padding=1)
+        self.conv5_2 = nn.Conv1d(32, 24, kernel_size=5, stride=1, padding=2)
+        self.conv7_2 = nn.Conv1d(32, 12, kernel_size=7, stride=1, padding=3)
+        self.maxpool_2 = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
+        self.conv1_frommax = nn.Conv1d(32, 4, kernel_size=1, stride=1, padding=0)
+
+        self.avgpool = nn.AvgPool1d(kernel_size=3, stride=2, padding=1)
         self.flatten = nn.Flatten()
-        
-        linear1_in_dim = int(num_notes * 3 * second_channel / 4)
-        self.linear1 = nn.Linear(linear1_in_dim, emb_dim)
-        self.linear2 = nn.Linear(emb_dim, out_dim)
+
+        self.linear1 = nn.Linear(1536, 512)
+        self.linear2 = nn.Linear(512, 128)
 
     def forward(self, x):
-        h = torch.reshape(x, (x.shape[0] * x.shape[1], 1, -1))
+        # Flatten the batch and timestep dimensions into first dimension, and swap the features and channels dimensions
+        h = torch.reshape(x, (x.shape[0] * x.shape[1], x.shape[-1], -1))
 
-        h3 = F.relu(self.conv3_1(h))
-        h3 = self.pool(h3)
-        h3 = F.relu(self.conv3_2(h3))
-        h3 = self.pool(h3)
-        h3 = self.flatten(h3)
+        h1_1 = F.relu(self.conv1_1(h))
+        h3_1 = F.relu(self.conv3_1(h))
+        h5_1 = F.relu(self.conv5_1(h))
+        h7_1 = F.relu(self.conv7_1(h))
+        max_1 = self.maxpool_1(h)
 
-        h5 = F.relu(self.conv5_1(h))
-        h5 = self.pool(h5)
-        h5 = F.relu(self.conv5_2(h5))
-        h5 = self.pool(h5)
-        h5 = self.flatten(h5)
+        h_1 = torch.cat((h1_1, h3_1, h5_1, h7_1, max_1), dim=-2)
+        h_1 = self.maxpool_1_to_2(h_1)
 
-        h7 = F.relu(self.conv7_1(h))
-        h7 = self.pool(h7)
-        h7 = F.relu(self.conv7_2(h7))
-        h7 = self.pool(h7)
-        h7 = self.flatten(h7)
+        h1_2 = F.relu(self.conv1_2(h_1))
+        h3_2 = F.relu(self.conv3_2(h_1))
+        h5_2 = F.relu(self.conv5_2(h_1))
+        h7_2 = F.relu(self.conv7_2(h_1))
+        max_2 = self.maxpool_2(h_1)
+        max_2 = F.relu(self.conv1_frommax(max_2))
 
-        pos = torch.cat((h3, h5, h7), dim=-1)
-        pos = F.relu(self.linear1(pos))
-        pos = self.linear2(pos)
-        pos = torch.reshape(pos, (x.shape[0], x.shape[1], -1))
-        return pos
+        h_2 = torch.cat((h1_2, h3_2, h5_2, h7_2, max_2), dim=-2)
+        h_2 = self.avgpool(h_2)
+
+        h_3 = self.flatten(h_2)
+        h_3 = F.relu(self.linear1(h_3))
+        h_3 = self.linear2(h_3)
+        h_3 = torch.reshape(h_3, (x.shape[0], x.shape[1], -1))
+        return h_3
 
 class Lalama(nn.Module):
     def __init__(self, config, dropout):
@@ -85,16 +95,16 @@ class Lalama(nn.Module):
         output = (hidden_states, present_key_values) if self.config.use_cache and not self.training else (hidden_states, )
         return output
     
-class ConvLalama(nn.Module):
-    def __init__(self, config, num_notes, first_channel, second_channel, conv_emb_dim, dropout=0.1):
+class IncLalama(nn.Module):
+    def __init__(self, config, num_notes, dropout=0.1):
         super().__init__()
         self.config = config
-        self.conv_model = ConvModel(num_notes, first_channel, second_channel, conv_emb_dim, out_dim=config.hidden_size)
+        self.incep_model = InceptionModel(num_notes)
         self.lalama = Lalama(config, dropout)
         self.linear = nn.Linear(config.hidden_size, num_notes)
 
     def forward(self, source, past_key_values=None):
-        src = self.conv_model(source)
+        src = self.incep_model(source)
         lalama_out = self.lalama(src, past_key_values)
         pred = self.linear(lalama_out[0])
         output = (pred, lalama_out[1]) if self.config.use_cache and not self.training else (pred, )
@@ -171,7 +181,7 @@ def model_fn(model_dir):
         rope_scaling=None,
     )
 
-    model = ConvLalama(config, NUM_NOTES, first_channel=8, second_channel=32, conv_emb_dim=512)
+    model = IncLalama(config, NUM_NOTES, dropout=0.0)
     with open(os.path.join(model_dir, "model.pth"), "rb") as f:
         model.load_state_dict(torch.load(f, map_location=device))
     model.to(device).eval()
