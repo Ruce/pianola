@@ -14,26 +14,25 @@ from transformers.models.llama.modeling_llama import LlamaDecoderLayer, _make_ca
 class InceptionModel(nn.Module):
     def __init__(self, num_notes):
         super().__init__()
-        self.conv1_1 = nn.Conv1d(1, 5, kernel_size=1, stride=1, padding=0)
-        self.conv3_1 = nn.Conv1d(1, 16, kernel_size=3, stride=1, padding=1)
+        self.conv1_1 = nn.Conv1d(1, 3, kernel_size=1, stride=1, padding=0)
+        self.conv3_1 = nn.Conv1d(1, 10, kernel_size=3, stride=1, padding=1)
         self.conv5_1 = nn.Conv1d(1, 6, kernel_size=5, stride=1, padding=2)
         self.conv7_1 = nn.Conv1d(1, 4, kernel_size=7, stride=1, padding=3)
         self.maxpool_1 = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
 
         self.maxpool_1_to_2 = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
 
-        self.conv1_2 = nn.Conv1d(32, 8, kernel_size=1, stride=1, padding=0)
-        self.conv3_2 = nn.Conv1d(32, 48, kernel_size=3, stride=1, padding=1)
-        self.conv5_2 = nn.Conv1d(32, 24, kernel_size=5, stride=1, padding=2)
-        self.conv7_2 = nn.Conv1d(32, 12, kernel_size=7, stride=1, padding=3)
+        self.conv1_2 = nn.Conv1d(24, 8, kernel_size=1, stride=1, padding=0)
+        self.conv3_2 = nn.Conv1d(24, 18, kernel_size=3, stride=1, padding=1)
+        self.conv5_2 = nn.Conv1d(24, 12, kernel_size=5, stride=1, padding=2)
+        self.conv7_2 = nn.Conv1d(24, 6, kernel_size=7, stride=1, padding=3)
         self.maxpool_2 = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
-        self.conv1_frommax = nn.Conv1d(32, 4, kernel_size=1, stride=1, padding=0)
+        self.conv1_frommax = nn.Conv1d(24, 4, kernel_size=1, stride=1, padding=0)
 
         self.avgpool = nn.AvgPool1d(kernel_size=3, stride=2, padding=1)
         self.flatten = nn.Flatten()
 
-        self.linear1 = nn.Linear(1536, 512)
-        self.linear2 = nn.Linear(512, 128)
+        self.linear1 = nn.Linear(768, 128)
 
     def forward(self, x):
         # Flatten the batch and timestep dimensions into first dimension, and swap the features and channels dimensions
@@ -59,8 +58,7 @@ class InceptionModel(nn.Module):
         h_2 = self.avgpool(h_2)
 
         h_3 = self.flatten(h_2)
-        h_3 = F.relu(self.linear1(h_3))
-        h_3 = self.linear2(h_3)
+        h_3 = self.linear1(h_3)
         h_3 = torch.reshape(h_3, (x.shape[0], x.shape[1], -1))
         return h_3
 
@@ -70,10 +68,10 @@ class Lalama(nn.Module):
         self.config = config
         self.layers = nn.ModuleList([LlamaDecoderLayer(config) for _ in range(config.num_hidden_layers)])
         self.dropout = nn.Dropout(dropout)
-  
+
     def forward(self, x, past_key_values=None):
         '''
-          `past_key_values`: a list of `num_hidden_layers` length,where each element is a tuple containing the cached `key` and `value` tensors of shape (batch_size, num_heads, seq_len, hidden_dim)
+            `past_key_values`: a list of `num_hidden_layers` length,where each element is a tuple containing the cached `key` and `value` tensors of shape (batch_size, num_heads, seq_len, hidden_dim)
         '''
         hidden_states = x
         seq_len = hidden_states.shape[-2]
@@ -90,23 +88,88 @@ class Lalama(nn.Module):
             hidden_states, present_key_value = layer(hidden_states, attention_mask, position_ids, past_key_value, use_cache=self.config.use_cache)
             hidden_states = self.dropout(hidden_states)
             present_key_values.append(present_key_value)
-        
+
         # Only return cache key_values if not training, because they are not consistent from dropout during training
         output = (hidden_states, present_key_values) if self.config.use_cache and not self.training else (hidden_states, )
         return output
-    
-class IncLalama(nn.Module):
-    def __init__(self, config, num_notes, dropout=0.1):
+
+class NoteClassifier(nn.Module):
+    def __init__(self, x_dim, emb_dim, chain_length):
+        super().__init__()
+        self.note_linear1 = nn.Linear(x_dim + chain_length, emb_dim)
+        self.note_linear2 = nn.Linear(emb_dim, 1)
+
+    def forward(self, x):
+        h = F.relu(self.note_linear1(x))
+        h = self.note_linear2(h)
+        return h
+
+class ChainClassifier(nn.Module):
+    def __init__(self, num_notes, x_dim, emb_dim, chain_length):
+        super().__init__()
+        self.num_notes = num_notes
+        self.chain_length = chain_length
+        self.chain_linear1 = nn.Linear(chain_length, chain_length)
+        self.chain_linear2 = nn.Linear(chain_length, chain_length)
+        self.note_classifiers = torch.nn.ModuleList()
+        for _ in range(num_notes):
+            self.note_classifiers.append(NoteClassifier(x_dim, emb_dim, chain_length))
+
+    def train_model(self, x, labels):
+        assert labels.shape[-1] == self.num_notes
+
+        # Get the previous `self.chain_length` labels for each note n
+        labels = F.pad(labels, (self.chain_length, 0))
+        links = torch.stack([labels[..., n:n+self.chain_length] for n in range(self.num_notes)], dim=-2)
+
+        # Encode the previous labels
+        l = F.relu(self.chain_linear1(links))
+        l = self.chain_linear2(l)
+
+        out = []
+        for n in range(self.num_notes):
+            note_l = l[..., n, :]
+            h = torch.cat((x, note_l), dim=-1)
+            out.append(self.note_classifiers[n](h))
+        return torch.cat(out, dim=-1)
+
+    def forward(self, x):
+        # To get labels shape, replace last dim of x (feature space) with `num_notes` and padding `chain_length`
+        labels_shape = list(x.shape)
+        labels_shape[-1] = self.num_notes + self.chain_length
+        labels = torch.zeros(labels_shape).to(device)
+
+        for n in range(self.num_notes):
+            # Encode the previous labels
+            note_links = labels[..., n:n+self.chain_length]
+            note_l = F.relu(self.chain_linear1(note_links))
+            note_l = self.chain_linear2(note_l)
+
+            h = torch.cat((x, note_l), dim=-1)
+            note_pred = self.note_classifiers[n](h).squeeze(dim=-1)
+            labels[..., n+self.chain_length] = torch.bernoulli(torch.sigmoid(note_pred))
+
+        # Remove padding and return predicted labels
+        return labels[..., self.chain_length:]
+
+class LalaC(nn.Module):
+    def __init__(self, config, num_notes, chain_emb_dim, chain_length, dropout=0.1):
         super().__init__()
         self.config = config
-        self.incep_model = InceptionModel(num_notes)
+        self.incep = InceptionModel(num_notes)
         self.lalama = Lalama(config, dropout)
-        self.linear = nn.Linear(config.hidden_size, num_notes)
+        self.chain = ChainClassifier(num_notes, config.hidden_size, chain_emb_dim, chain_length)
+
+    def train_model(self, source, labels):
+        src = self.incep(source)
+        lalama_out = self.lalama(src)
+        pred = self.chain.train_model(lalama_out[0], labels)
+        return (pred, )
 
     def forward(self, source, past_key_values=None):
-        src = self.incep_model(source)
+        src = self.incep(source)
         lalama_out = self.lalama(src, past_key_values)
-        pred = self.linear(lalama_out[0])
+        pred = self.chain(lalama_out[0])
         output = (pred, lalama_out[1]) if self.config.use_cache and not self.training else (pred, )
         return output
 
@@ -135,18 +198,8 @@ def notes_str_to_tensor(notes_str, num_notes):
             active_notes = [int(n) for n in active_notes_str.split(NOTES_DELIMITER)]
             notes_tensor[t, active_notes] = 1
     return notes_tensor
-  
-def decode_tensor(y_hat, max_notes):
-    assert len(y_hat.shape) == 1
-    sample = torch.bernoulli(y_hat)
-    if torch.count_nonzero(sample) > max_notes:
-        sample_prob = y_hat * sample
-        to_keep = torch.argsort(sample_prob, descending=True)[:max_notes]
-        sample = torch.zeros(y_hat.shape)
-        sample[to_keep] = 1
-    return sample
 
-def generate_music(model, seed, timesteps, max_notes=6):
+def generate_music(model, seed, timesteps):
     # Input `seed` and output shapes: (timesteps, num_notes)
     # For convolutional models, expected input shape is (batch_size, timesteps, num_notes, 1)
     source = seed.unsqueeze(dim=0).unsqueeze(dim=-1)
@@ -157,8 +210,7 @@ def generate_music(model, seed, timesteps, max_notes=6):
         past_key_values = None
         for i in range(timesteps):
             pred, past_key_values = model(source, past_key_values)
-            y_hat = torch.sigmoid(pred[:, -1]).squeeze(dim=0) # Keep only the last timestep and remove batch_size dimension
-            new_notes = decode_tensor(y_hat, max_notes) # Decode probabilities in y_hat
+            new_notes = pred[:, -1].squeeze(dim=0) # Keep only the last timestep and remove batch_size dimension
             generated.append(new_notes)
             source = new_notes.reshape((1, 1, -1, 1))
     return torch.stack(generated)
@@ -181,7 +233,7 @@ def model_fn(model_dir):
         rope_scaling=None,
     )
 
-    model = IncLalama(config, NUM_NOTES, dropout=0.0)
+    model = LalaC(config, NUM_NOTES, chain_emb_dim=32, chain_length=12, dropout=0.0)
     with open(os.path.join(model_dir, "model.pth"), "rb") as f:
         model.load_state_dict(torch.load(f, map_location=device))
     model.to(device).eval()
