@@ -36,6 +36,7 @@ class Piano {
 		this.startTone();
 		this.lastActivity = new Date();
 		if (this.awaitingPlayerInput) {
+			this.setBPM(this.defaultBPM);
 			this.seedInputListener();
 		}
 		this.playNote(this.pianoKeys[keyNum], Actor.Player);
@@ -108,7 +109,6 @@ class Piano {
 		Tone.Transport.cancel();
 		Tone.Transport.stop();
 		this.toneStarted = false;
-		this.setBPM(this.defaultBPM);
 		
 		if (typeof this.callModelIntervalId !== 'undefined') {
 			clearInterval(this.callModelIntervalId);
@@ -150,6 +150,7 @@ class Piano {
 	
 	playExample(data, bpm) {
 		this.stopCallModel();
+		this.awaitingPlayerInput = false;
 		this.setBPM(bpm);
 		this.startTone();
 		this.lastActivity = new Date();
@@ -194,6 +195,9 @@ class Piano {
 	setBPM(bpm) {
 		Tone.Transport.bpm.value = bpm;
 		this.callModelSeconds = this.bufferBeats / bpm * 60;
+		if (typeof this.notesCanvas !== 'undefined') {
+			this.notesCanvas.setBPM(bpm);
+		}
 	}
 	
 	startTone() {
@@ -207,6 +211,7 @@ class Piano {
 	
 	bindNotesCanvas(notesCanvas) {
 		this.notesCanvas = notesCanvas;
+		this.notesCanvas.setBPM(this.defaultBPM);
 	}
 }
 

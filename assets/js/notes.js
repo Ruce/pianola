@@ -42,12 +42,16 @@ class NotesCanvas {
 	
 	addNoteBar(pianoKey, currTime, actor) {
 		const x = this.piano.pianoCanvas.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
-		this.activeBars.push({startTime: currTime, x: x, isWhiteKey: pianoKey.isWhiteKey, actor: actor});
+		this.activeBars.push({lastUpdateTime: currTime, x: x, relativeY: 1, isWhiteKey: pianoKey.isWhiteKey, actor: actor});
 		
 		if (!this.animationActive) {
 			this.animationActive = true;
 			this.triggerAnimation();
 		}
+	}
+	
+	setBPM(bpm) {
+		this.bpm = bpm;
 	}
 	
 	triggerAnimation() {
@@ -70,10 +74,13 @@ class NotesCanvas {
 		if (this.activeBars.length > 0) {
 			const newActiveBars = [];
 			const currTime = new Date();
-			const rectHeight = this.canvas.height / 26;
+			const rectHeight = this.canvas.height / 28;
+			const noteLongevity = (6 / (this.bpm / 60)) * 1000; // Number of milliseconds that a note lives on screen (i.e. scrolls from bottom to top)
 			
 			for (const n of this.activeBars) {
-				const rectY = this.canvas.height - ((currTime - n.startTime) * this.canvas.height / 3000);
+				n.relativeY -= (currTime - n.lastUpdateTime) / noteLongevity;
+				const rectY = this.canvas.height * n.relativeY;
+				//const rectY = this.canvas.height - ((currTime - n.lastUpdateTime) * this.canvas.height / 3000);
 				const noteWidth = n.isWhiteKey ? this.piano.pianoCanvas.whiteKeyWidth : this.piano.pianoCanvas.blackKeyWidth;
 				
 				if (n.actor === Actor.Player) {
@@ -91,6 +98,7 @@ class NotesCanvas {
 				ctx.fill();
 				
 				if (rectY + rectHeight + shadowBlur > 0) {
+					n.lastUpdateTime = currTime;
 					newActiveBars.push(n);
 				}
 			}
