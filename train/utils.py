@@ -52,7 +52,11 @@ class MidiDataset(Dataset):
           padding = (0, abs(note_shift)) if len(tensor.shape) == 2 else (0, 0, 0, abs(note_shift))
           tensor = F.pad(tensor, padding)
           tensor = tensor[:, abs(note_shift):]
-        return tensor[start:end].unsqueeze(dim=-1), tensor[start+1:end+1]
+        x = tensor[start:end]
+        if len(x.shape) == 2:
+          x = x.unsqueeze(dim=-1) # Add a channel dimension
+        y = tensor[start+1:end+1]
+        return x, y
 
 class MidiUtil():
   def get_midi_timesteps(filename):
