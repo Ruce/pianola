@@ -20,6 +20,24 @@ class Note {
 	}
 }
 
+class NoteBar {
+	constructor(lastUpdateTime, relativeX, relativeY, isWhiteKey, actor) {
+		this.lastUpdateTime = lastUpdateTime;
+		this.relativeX = relativeX;
+		this.relativeY = relativeY;
+		this.isWhiteKey = isWhiteKey;
+		this.actor = actor;
+	}
+	
+	static get fill() {
+		return {
+			player: { white: '#FDFD66', black: '#FFBF00', shadow: 'yellow'},
+			model: { white: '#BEFCFF', black: '#5EBBBF', shadow: '#7DF9FF'},
+			bot: { white: '#C6FEE2', black: '#59DD9C', shadow: '#79FDBC'}
+		};
+	}
+}
+
 class NotesCanvas {
 	constructor(canvasId, piano) {
 		this.piano = piano;
@@ -32,17 +50,10 @@ class NotesCanvas {
 		this.triggerAnimation();
 	}
 	
-	static get barFill() {
-		return {
-			player: { white: '#FDFD66', black: '#FFBF00', shadow: 'yellow'},
-			model: { white: '#BEFCFF', black: '#5EBBBF', shadow: '#7DF9FF'},
-			bot: { white: '#C6FEE2', black: '#59DD9C', shadow: '#79FDBC'}
-		};
-	}
-	
 	addNoteBar(pianoKey, currTime, actor) {
 		const x = this.piano.pianoCanvas.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
-		this.activeBars.push({lastUpdateTime: currTime, x: x, relativeY: 1, isWhiteKey: pianoKey.isWhiteKey, actor: actor});
+		const relativeX = x / this.canvas.width; 
+		this.activeBars.push(new NoteBar(currTime, relativeX, 1, pianoKey.isWhiteKey, actor));
 		
 		if (!this.animationActive) {
 			this.animationActive = true;
@@ -79,22 +90,23 @@ class NotesCanvas {
 			
 			for (const n of this.activeBars) {
 				n.relativeY -= (currTime - n.lastUpdateTime) / noteLongevity;
+				const rectX = this.canvas.width * n.relativeX;
 				const rectY = this.canvas.height * n.relativeY;
 				//const rectY = this.canvas.height - ((currTime - n.lastUpdateTime) * this.canvas.height / 3000);
 				const noteWidth = n.isWhiteKey ? this.piano.pianoCanvas.whiteKeyWidth : this.piano.pianoCanvas.blackKeyWidth;
 				
 				if (n.actor === Actor.Player) {
-					ctx.fillStyle = n.isWhiteKey ? NotesCanvas.barFill.player.white : NotesCanvas.barFill.player.black;
-					ctx.shadowColor = NotesCanvas.barFill.player.shadow;
+					ctx.fillStyle = n.isWhiteKey ? NoteBar.fill.player.white : NoteBar.fill.player.black;
+					ctx.shadowColor = NoteBar.fill.player.shadow;
 				} else if (n.actor === Actor.Bot) {
-					ctx.fillStyle = n.isWhiteKey ? NotesCanvas.barFill.bot.white : NotesCanvas.barFill.bot.black;
-					ctx.shadowColor = NotesCanvas.barFill.bot.shadow;
+					ctx.fillStyle = n.isWhiteKey ? NoteBar.fill.bot.white : NoteBar.fill.bot.black;
+					ctx.shadowColor = NoteBar.fill.bot.shadow;
 				} else if (n.actor === Actor.Model) {
-					ctx.fillStyle = n.isWhiteKey ? NotesCanvas.barFill.model.white : NotesCanvas.barFill.model.black;
-					ctx.shadowColor = NotesCanvas.barFill.model.shadow;
+					ctx.fillStyle = n.isWhiteKey ? NoteBar.fill.model.white : NoteBar.fill.model.black;
+					ctx.shadowColor = NoteBar.fill.model.shadow;
 				}
 				ctx.beginPath();
-				ctx.roundRect(n.x, rectY, noteWidth, rectHeight, 3);
+				ctx.roundRect(rectX, rectY, noteWidth, rectHeight, 3);
 				ctx.fill();
 				
 				if (rectY + rectHeight + shadowBlur > 0) {
