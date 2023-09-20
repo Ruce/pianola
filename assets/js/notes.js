@@ -21,12 +21,16 @@ class Note {
 }
 
 class NoteBar {
-	constructor(lastUpdateTime, relativeX, relativeY, isWhiteKey, actor) {
+	constructor(pianoKey, lastUpdateTime, endTime, relativeX, actor) {
+		this.keyNum = pianoKey.keyNum;
+		this.isWhiteKey = pianoKey.isWhiteKey;
 		this.lastUpdateTime = lastUpdateTime;
+		this.endTime = endTime;
 		this.relativeX = relativeX;
-		this.relativeY = relativeY;
-		this.isWhiteKey = isWhiteKey;
 		this.actor = actor;
+		
+		this.relativeTop = 1;
+		this.relativeBot = 1.005;
 	}
 	
 	static get fill() {
@@ -50,14 +54,25 @@ class NotesCanvas {
 		this.triggerAnimation();
 	}
 	
-	addNoteBar(pianoKey, currTime, actor) {
+	addNoteBar(pianoKey, currTime, endTime, actor) {
 		const x = this.piano.pianoCanvas.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
-		const relativeX = x / this.canvas.width; 
-		this.activeBars.push(new NoteBar(currTime, relativeX, 1, pianoKey.isWhiteKey, actor));
+		const relativeX = x / this.canvas.width;
+		const isPressed = false;
+		const noteBar = new NoteBar(pianoKey, currTime, endTime, relativeX, actor);
+		this.activeBars.push(noteBar);
 		
 		if (!this.animationActive) {
 			this.animationActive = true;
 			this.triggerAnimation();
+		}
+	}
+	
+	releaseNote(keyNum, time) {
+		const activeBar = this.activeBars.find(noteBar => {
+			return noteBar.keyNum === keyNum && noteBar.endTime === -1
+		});
+		if (typeof activeBar !== 'undefined') {
+			activeBar.endTime = time;
 		}
 	}
 	
@@ -80,20 +95,23 @@ class NotesCanvas {
 		//ctx.fillStyle = 'red';
 		//ctx.fillRect(0, new Date().getMilliseconds() / 10, 10, 10);
 		
-		const shadowBlur = 10;
+		const shadowBlur = 7;
 		ctx.shadowBlur = shadowBlur;
 		if (this.activeBars.length > 0) {
 			const newActiveBars = [];
 			const currTime = new Date();
-			const rectHeight = this.canvas.height / 28;
 			const noteLongevity = (6 / (this.bpm / 60)) * 1000; // Number of milliseconds that a note lives on screen (i.e. scrolls from bottom to top)
 			
 			for (const n of this.activeBars) {
-				n.relativeY -= (currTime - n.lastUpdateTime) / noteLongevity;
-				const rectX = this.canvas.width * n.relativeX;
-				const rectY = this.canvas.height * n.relativeY;
-				//const rectY = this.canvas.height - ((currTime - n.lastUpdateTime) * this.canvas.height / 3000);
+				const yDelta = (currTime - n.lastUpdateTime) / noteLongevity;
+				n.relativeTop = Math.max(n.relativeTop - yDelta, 0);
+				if (n.endTime <= currTime && n.endTime != -1) {
+					n.relativeBot = Math.max(n.relativeBot - yDelta, 0);
+				}
+				const rectX = n.relativeX * this.canvas.width;
+				const rectY = n.relativeTop * this.canvas.height;
 				const noteWidth = n.isWhiteKey ? this.piano.pianoCanvas.whiteKeyWidth : this.piano.pianoCanvas.blackKeyWidth;
+				const noteHeight = (n.relativeBot - n.relativeTop) * this.canvas.height;
 				
 				if (n.actor === Actor.Player) {
 					ctx.fillStyle = n.isWhiteKey ? NoteBar.fill.player.white : NoteBar.fill.player.black;
@@ -106,10 +124,11 @@ class NotesCanvas {
 					ctx.shadowColor = NoteBar.fill.model.shadow;
 				}
 				ctx.beginPath();
-				ctx.roundRect(rectX, rectY, noteWidth, rectHeight, 3);
+				ctx.roundRect(rectX, rectY, noteWidth, noteHeight, 3);
 				ctx.fill();
 				
-				if (rectY + rectHeight + shadowBlur > 0) {
+				//if (rectY + noteHeight + shadowBlur > 0) {
+				if (n.relativeBot > 0) {
 					n.lastUpdateTime = currTime;
 					newActiveBars.push(n);
 				}

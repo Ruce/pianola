@@ -12,6 +12,7 @@ class Piano {
 		this.toneStarted = false;
 		this.isCallingModel = false;
 		this.awaitingPlayerInput = true;
+		this.activeNotes = [];
 		this.noteHistory = [];
 		this.lastActivity = new Date();
 		
@@ -39,7 +40,41 @@ class Piano {
 			this.setBPM(this.defaultBPM);
 			this.seedInputListener();
 		}
-		this.playNote(this.pianoKeys[keyNum], Actor.Player);
+		//this.playNote(this.pianoKeys[keyNum], Actor.Player);
+		this.holdNote(this.pianoKeys[keyNum], Actor.Player);
+	}
+		
+	holdNote(pianoKey, actor, time, transportPosition=Tone.Transport.position) {
+		const currTime = new Date();
+		this.sampler.triggerAttack(pianoKey.keyName, time);
+		this.activeNotes.push(pianoKey);
+		
+		const endTime = new Date(currTime);
+		endTime.setMilliseconds(endTime.getMilliseconds() + 200); // Key lights up for 200 milliseconds
+		this.pianoCanvas.activeKeys.push({key: pianoKey, endTime: endTime, actor: actor});
+		this.noteHistory.push(new Note(pianoKey.keyNum, transportPosition));
+		
+		// Draw note on canvases
+		this.pianoCanvas.triggerDraw();
+		this.notesCanvas.addNoteBar(pianoKey, currTime, -1, actor);
+		
+		return transportPosition;
+	}
+	
+	releaseNote(pianoKey) {
+		// Check if `pianoKey` is in the `activeNotes` array, and if so release the note
+		const keyIndex = this.activeNotes.indexOf(pianoKey);
+		if (keyIndex > -1) {
+			this.sampler.triggerRelease(pianoKey.keyName, Tone.now() + 0.1);
+			this.activeNotes.splice(keyIndex, 1);
+			this.notesCanvas.releaseNote(pianoKey.keyNum, new Date());
+		}
+	}
+	
+	releaseAllNotes() {
+		for (const pianoKey of [...this.activeNotes]) {
+			this.releaseNote(pianoKey);
+		}
 	}
 	
 	playNote(pianoKey, actor, time, transportPosition=Tone.Transport.position) {
@@ -53,7 +88,7 @@ class Piano {
 		
 		// Draw note on canvases
 		this.pianoCanvas.triggerDraw();
-		this.notesCanvas.addNoteBar(pianoKey, currTime, actor);
+		this.notesCanvas.addNoteBar(pianoKey, currTime, endTime, actor);
 		
 		return transportPosition;
 	}
@@ -185,7 +220,7 @@ class Piano {
 		const sampler = new Tone.Sampler({
 			urls: sampleFiles,
 			baseUrl: "assets/samples/piano/",
-			release: 0.5,
+			release: 0.3,
 			volume: -8
 		}).toDestination();
 		
@@ -230,6 +265,7 @@ class PianoCanvas {
 		this.canvas = document.getElementById(canvasId);
 		this.canvas.addEventListener('mousedown', this.mouseDownKeyboard.bind(this));
 		this.canvas.addEventListener('mousemove', this.mouseMoveKeyboard.bind(this));
+		this.canvas.addEventListener('mouseup', this.mouseOutKeyboard.bind(this));
 		this.canvas.addEventListener('mouseout', this.mouseOutKeyboard.bind(this));
 		this.triggerDraw();
 	}
@@ -330,7 +366,8 @@ class PianoCanvas {
 			// Newly moused over key
 			this.triggerDraw();
 			if (globalMouseDown) {
-				this.piano.playNote(this.hoverKey, Actor.Player);
+				this.piano.releaseNote(this.prevHoverKey);
+				this.piano.holdNote(this.hoverKey, Actor.Player);
 			}
 			this.prevHoverKey = this.hoverKey;
 		}
@@ -339,6 +376,7 @@ class PianoCanvas {
 	mouseOutKeyboard(event) {
 		this.hoverKey = null;
 		this.prevHoverKey = null;
+		this.piano.releaseAllNotes();
 		this.triggerDraw();
 	}
 	
