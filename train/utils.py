@@ -6,6 +6,7 @@ import random
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
+from scipy.stats import circmean, circvar
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -100,7 +101,7 @@ class MidiUtil():
     assert midi.type == 0 or midi.type == 1, "Type 2 MIDI files are not supported"
     
     max_timesteps = MidiUtil.get_midi_timesteps(filename)
-     # 128 notes as in MIDI specifications; last dimension is (velocity, duration)
+    # 128 notes as in MIDI specifications; last dimension is (velocity, duration)
     output = np.zeros((max_timesteps, 128, 2))
     for track in midi.tracks:
       t = 0
