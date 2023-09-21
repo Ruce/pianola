@@ -40,23 +40,24 @@ class Piano {
 			this.setBPM(this.defaultBPM);
 			this.seedInputListener();
 		}
-		this.playNote(this.pianoKeys[keyNum], Actor.Player, -1);
+		this.playNote(this.pianoKeys[keyNum], 0.7, -1, Actor.Player);
 	}
 	
-	playNote(pianoKey, actor, duration, time, transportPosition=Tone.Transport.position) {
+	playNote(pianoKey, velocity, duration, actor, time, transportPosition=Tone.Transport.position) {
 		const currTime = new Date();
-		this.noteHistory.push(new Note(pianoKey.keyNum, transportPosition));
+		this.noteHistory.push(new Note(pianoKey.keyNum, velocity, duration, transportPosition));
 		
 		let endTime = -1;
 		if (duration === -1) {
 			// Note is being held down
-			this.sampler.triggerAttack(pianoKey.keyName, time);
+			this.sampler.triggerAttack(pianoKey.keyName, time, velocity);
 		} else {
-			const triggerDuration = (duration / 1000) + 0.15; // Add a short delay to the end of the sound (in seconds)
-			this.sampler.triggerAttackRelease(pianoKey.keyName, triggerDuration, time);
+			const durationMilliseconds = ((duration * 60 * 1000) / (this.bpm * 4)) * 0.9 - 10; // Shorten duration slightly to add a gap between notes
+			const triggerDuration = (durationMilliseconds / 1000) + 0.15; // Add a short delay to the end of the sound (in seconds)
+			this.sampler.triggerAttackRelease(pianoKey.keyName, triggerDuration, time, velocity);
 			
 			endTime = new Date(currTime);
-			endTime.setMilliseconds(endTime.getMilliseconds() + duration); // Key lights up for 150 milliseconds
+			endTime.setMilliseconds(endTime.getMilliseconds() + durationMilliseconds); // Key lights up for 150 milliseconds
 		}
 		
 		// Check if pianoKey is already active, and if so overwrite its `endTime`
@@ -92,8 +93,8 @@ class Piano {
 		}
 	}
 	
-	scheduleNote(pianoKey, triggerTime, actor) {
-		Tone.Transport.scheduleOnce((time) => this.playNote(pianoKey, actor, 150, time, triggerTime), triggerTime);
+	scheduleNote(pianoKey, velocity, duration, triggerTime, actor) {
+		Tone.Transport.scheduleOnce((time) => this.playNote(pianoKey, velocity, duration, actor, time, triggerTime), triggerTime);
 	}
 	
 	async callModel(customHistory) {
@@ -110,7 +111,7 @@ class Piano {
 		// Check if the model is still active (i.e. hasn't been stopped) before scheduling notes
 		if (this.isCallingModel) {
 			for (const note of generated) {
-				this.scheduleNote(this.pianoKeys[note.keyNum], note.position, Actor.Model);
+				this.scheduleNote(this.pianoKeys[note.keyNum], note.velocity, note.duration, note.position, Actor.Model);
 			}
 		}
 	}
@@ -160,7 +161,7 @@ class Piano {
 		if (typeof this.lastSeedInputPosition === 'undefined' || this.lastSeedInputPosition === null) {
 			const listenerElement = document.getElementById("listener");
 			listenerElement.style.visibility = "visible";
-			this.listenerIntervalId = setInterval(this.seedInputAwaiter.bind(this), 100)
+			this.listenerIntervalId = setInterval(this.seedInputAwaiter.bind(this), 100);
 		}
 		this.lastSeedInputPosition = Tone.Transport.position;
 	}
@@ -191,9 +192,9 @@ class Piano {
 		
 		let lastNoteTick = 0;
 		const startPosition = Tone.Time(Tone.Transport.position).toTicks();
-		const notes = PianolaModel.parseNotes(data, startPosition);
+		const notes = PianolaModel.queryStringToNotes(data, startPosition);
 		for (const note of notes) {
-			this.scheduleNote(this.pianoKeys[note.keyNum], note.position, Actor.Bot);
+			this.scheduleNote(this.pianoKeys[note.keyNum], note.velocity, note.duration, note.position, Actor.Bot);
 			lastNoteTick = Tone.Time(note.position).toTicks();
 		}
 		
@@ -228,6 +229,7 @@ class Piano {
 	
 	setBPM(bpm) {
 		Tone.Transport.bpm.value = bpm;
+		this.bpm = bpm;
 		this.callModelSeconds = this.bufferBeats / bpm * 60;
 		if (typeof this.notesCanvas !== 'undefined') {
 			this.notesCanvas.setBPM(bpm);
@@ -365,7 +367,7 @@ class PianoCanvas {
 			this.triggerDraw();
 			if (globalMouseDown) {
 				this.piano.releaseNote(this.prevHoverKey);
-				this.piano.playNote(this.hoverKey, Actor.Player, -1);
+				this.piano.playNote(this.hoverKey, 0.7, -1, Actor.Player);
 			}
 			this.prevHoverKey = this.hoverKey;
 		}

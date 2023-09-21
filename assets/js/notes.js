@@ -1,6 +1,8 @@
 class Note {
-	constructor(keyNum, position) {
+	constructor(keyNum, velocity, duration, position) {
 		this.keyNum = keyNum;
+		this.velocity = velocity;
+		this.duration = duration;
 		this.position = position;
 	}
 	

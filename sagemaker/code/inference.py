@@ -6,7 +6,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Linear, ReLU, Module, Sequential
+from torch.nn import Linear, ReLU, Module
 
 from transformers import LlamaConfig
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer, _make_causal_mask
@@ -14,10 +14,10 @@ from transformers.models.llama.modeling_llama import LlamaDecoderLayer, _make_ca
 class InceptionModel(nn.Module):
     def __init__(self, num_notes):
         super().__init__()
-        self.conv1_1 = nn.Conv1d(1, 3, kernel_size=1, stride=1, padding=0)
-        self.conv3_1 = nn.Conv1d(1, 10, kernel_size=3, stride=1, padding=1)
-        self.conv5_1 = nn.Conv1d(1, 6, kernel_size=5, stride=1, padding=2)
-        self.conv7_1 = nn.Conv1d(1, 4, kernel_size=7, stride=1, padding=3)
+        self.conv1_1 = nn.Conv1d(2, 2, kernel_size=1, stride=1, padding=0)
+        self.conv3_1 = nn.Conv1d(2, 10, kernel_size=3, stride=1, padding=1)
+        self.conv5_1 = nn.Conv1d(2, 6, kernel_size=5, stride=1, padding=2)
+        self.conv7_1 = nn.Conv1d(2, 4, kernel_size=7, stride=1, padding=3)
         self.maxpool_1 = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
 
         self.maxpool_1_to_2 = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
@@ -152,68 +152,109 @@ class ChainClassifier(nn.Module):
         # Remove padding and return predicted labels
         return labels[..., self.chain_length:]
 
-class LalaC(nn.Module):
+class FeatureModule(nn.Module):
+    def __init__(self, num_notes, hidden_size):
+        super().__init__()
+        self.linear_1 = nn.Linear(hidden_size, hidden_size)
+        self.linear_2 = nn.Linear(hidden_size, num_notes)
+
+    def forward(self, x):
+        h = F.relu(self.linear_1(x))
+        h = self.linear_2(h)
+        return h
+
+class LalaE(nn.Module):
     def __init__(self, config, num_notes, chain_emb_dim, chain_length, dropout=0.1):
         super().__init__()
         self.config = config
         self.incep = InceptionModel(num_notes)
         self.lalama = Lalama(config, dropout)
         self.chain = ChainClassifier(num_notes, config.hidden_size, chain_emb_dim, chain_length)
+        self.velocity = FeatureModule(num_notes, config.hidden_size)
+        self.duration = FeatureModule(num_notes, config.hidden_size)
 
     def train_model(self, source, labels):
         src = self.incep(source)
         lalama_out = self.lalama(src)
-        pred = self.chain.train_model(lalama_out[0], labels)
-        return (pred, )
+        note_pred = self.chain.train_model(lalama_out[0], labels)
+        velocity_pred = self.velocity(lalama_out[0])
+        duration_pred = self.duration(lalama_out[0])
+        return (note_pred, velocity_pred, duration_pred)
 
     def forward(self, source, past_key_values=None):
         src = self.incep(source)
         lalama_out = self.lalama(src, past_key_values)
-        pred = self.chain(lalama_out[0])
-        output = (pred, lalama_out[1]) if self.config.use_cache and not self.training else (pred, )
+        note_pred = self.chain(lalama_out[0])
+        velocity_pred = torch.clamp(self.velocity(lalama_out[0]), min=0, max=1)
+        duration_pred = torch.clamp(self.duration(lalama_out[0]), min=0)
+        output = (note_pred, velocity_pred, duration_pred, lalama_out[1]) if self.config.use_cache and not self.training else (note_pred, velocity_pred, duration_pred)
         return output
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 NUM_NOTES = 64
-WINDOW_SIZE = 128
-NOTES_DELIMITER = ','
+WINDOW_SIZE = 256
 TICKS_DELIMITER = ';'
 
-def notes_tensor_to_str(notes_tensor):
-    ticks = notes_tensor.shape[0]
-
+def feature_tensor_to_str(feature_tensor):
+    '''
+        Converts a tensor of shape (num_timesteps, num_notes, 2) to a string. Last dimension of tensor contains features (velocity, duration)
+        Output is a delimited string where each segment separated by `TICKS_DELIMITER` is a timestep, containing the active notes in that step
+        Active notes are represented as 6 character strings, where the first two characters is the note number, second two is velocity, and last two is duration
+        E.g. 126405: note = 12, velocity = 0.65 (see comments below about velocity), duration = 5
+    '''
     notes_list = []
-    for t in range(ticks):
-        active_notes_in_slice = torch.nonzero(notes_tensor[t], as_tuple=True)[0]
-        notes_list.append(NOTES_DELIMITER.join([str(n) for n in active_notes_in_slice.tolist()])) # Convert tensor to list to string
-    return TICKS_DELIMITER.join(notes_list)
+    for t in range(len(feature_tensor)):
+        slice_note_str = ''
+        tensor_slice = feature_tensor[t]
+        active_notes_in_slice = torch.nonzero(torch.sum(tensor_slice, dim=-1), as_tuple=True)[0].tolist()
+        for n in active_notes_in_slice:
+            # Transform velocity to a 2 digit integer ranging from 0 to 99
+            velocity = round((tensor_slice[n, 0].item() * 100) - 1)
+            velocity = max(min(velocity, 99), 0)
 
-def notes_str_to_tensor(notes_str, num_notes):
+            duration = round(tensor_slice[n, 1].item())
+            duration = max(min(duration, 99), 0)
+
+            slice_note_str += f"{n:02d}{velocity:02d}{duration:02d}"
+        notes_list.append(slice_note_str)
+    return TICKS_DELIMITER.join(notes_list)
+  
+def notes_str_to_feature_tensor(notes_str, num_notes):
     notes_slices = notes_str.split(TICKS_DELIMITER)
-    notes_tensor = torch.zeros((len(notes_slices), num_notes))
+    notes_tensor = torch.zeros((len(notes_slices), num_notes, 2), dtype=torch.float)
 
     for t, active_notes_str in enumerate(notes_slices):
         if len(active_notes_str) != 0:
-            active_notes = [int(n) for n in active_notes_str.split(NOTES_DELIMITER)]
-            notes_tensor[t, active_notes] = 1
+            active_notes = [active_notes_str[i:i+6] for i in range(0, len(active_notes_str), 6)]
+            for note_str in active_notes:
+                note_num = int(note_str[0:2])
+                velocity = (int(note_str[2:4]) + 1) / 100
+                duration = int(note_str[4:6])
+                notes_tensor[t, note_num, 0] = velocity
+                notes_tensor[t, note_num, 1] = duration
     return notes_tensor
 
 def generate_music(model, seed, timesteps):
-    # Input `seed` and output shapes: (timesteps, num_notes)
-    # For convolutional models, expected input shape is (batch_size, timesteps, num_notes, 1)
-    source = seed.unsqueeze(dim=0).unsqueeze(dim=-1)
+    '''
+        Input `seed` and output shapes: (timesteps, num_notes, 2), where the last dimension has features (velocity, duration)
+    '''
+    source = seed.unsqueeze(dim=0)
     generated = []
 
     model.eval()
     with torch.no_grad():
         past_key_values = None
         for i in range(timesteps):
-            pred, past_key_values = model(source, past_key_values)
+            note_pred, velocity_pred, duration_pred, past_key_values = model(source, past_key_values)
+            # Use note_pred as a mask to select feature values
+            velocity = note_pred * velocity_pred
+            duration = note_pred * duration_pred
+            pred = torch.stack((velocity, duration), dim=-1)
             new_notes = pred[:, -1].squeeze(dim=0) # Keep only the last timestep and remove batch_size dimension
             generated.append(new_notes)
-            source = new_notes.reshape((1, 1, -1, 1))
-    return torch.stack(generated)
+            source = new_notes.unsqueeze(dim=0).unsqueeze(dim=0) # Add batch and timestep dimensions
+    return torch.stack(generated, dim=0)
 
 # defining model and loading weights to it.
 def model_fn(model_dir):
@@ -232,8 +273,8 @@ def model_fn(model_dir):
         rope_theta=10000.0,
         rope_scaling=None,
     )
-
-    model = LalaC(config, NUM_NOTES, chain_emb_dim=32, chain_length=12, dropout=0.0)
+    
+    model = LalaE(config, NUM_NOTES, chain_emb_dim=32, chain_length=12, dropout=0.0)
     with open(os.path.join(model_dir, "model.pth"), "rb") as f:
         model.load_state_dict(torch.load(f, map_location=device))
     model.to(device).eval()
@@ -246,7 +287,7 @@ def input_fn(request_body, request_content_type):
     request_json = json.loads(request_body)
     notes_str = request_json["inputs"]
     timesteps = request_json["timesteps"]
-    data = notes_str_to_tensor(notes_str, num_notes=NUM_NOTES)
+    data = notes_str_to_feature_tensor(notes_str, num_notes=NUM_NOTES)
     return {'data': data, 'timesteps': timesteps}
 
 
@@ -262,5 +303,5 @@ def predict_fn(input_object, model):
 # postprocess
 def output_fn(predictions, content_type):
     assert content_type == "application/json"
-    res = notes_tensor_to_str(predictions)
+    res = feature_tensor_to_str(predictions)
     return json.dumps(res)
