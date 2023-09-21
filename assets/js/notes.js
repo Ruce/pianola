@@ -57,7 +57,9 @@ class NotesCanvas {
 	addNoteBar(pianoKey, currTime, endTime, actor) {
 		const x = this.piano.pianoCanvas.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
 		const relativeX = x / this.canvas.width;
-		const isPressed = false;
+		
+		// If this note was previously held, release it before playing the new note
+		this.releaseNote(pianoKey.keyNum, currTime);
 		const noteBar = new NoteBar(pianoKey, currTime, endTime, relativeX, actor);
 		this.activeBars.push(noteBar);
 		
@@ -68,9 +70,7 @@ class NotesCanvas {
 	}
 	
 	releaseNote(keyNum, time) {
-		const activeBar = this.activeBars.find(noteBar => {
-			return noteBar.keyNum === keyNum && noteBar.endTime === -1
-		});
+		const activeBar = this.activeBars.find(noteBar => noteBar.keyNum === keyNum && (noteBar.endTime > time || noteBar.endTime === -1));
 		if (typeof activeBar !== 'undefined') {
 			activeBar.endTime = time;
 		}

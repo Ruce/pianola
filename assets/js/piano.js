@@ -12,7 +12,7 @@ class Piano {
 		this.toneStarted = false;
 		this.isCallingModel = false;
 		this.awaitingPlayerInput = true;
-		this.activeNotes = [];
+		this.activeKeys = [];
 		this.noteHistory = [];
 		this.lastActivity = new Date();
 		
@@ -40,51 +40,32 @@ class Piano {
 			this.setBPM(this.defaultBPM);
 			this.seedInputListener();
 		}
-		//this.playNote(this.pianoKeys[keyNum], Actor.Player);
-		this.holdNote(this.pianoKeys[keyNum], Actor.Player);
+		this.playNote(this.pianoKeys[keyNum], Actor.Player, -1);
 	}
-		
-	holdNote(pianoKey, actor, time, transportPosition=Tone.Transport.position) {
+	
+	playNote(pianoKey, actor, duration, time, transportPosition=Tone.Transport.position) {
 		const currTime = new Date();
-		this.sampler.triggerAttack(pianoKey.keyName, time);
-		this.activeNotes.push(pianoKey);
-		
-		const endTime = new Date(currTime);
-		endTime.setMilliseconds(endTime.getMilliseconds() + 200); // Key lights up for 200 milliseconds
-		this.pianoCanvas.activeKeys.push({key: pianoKey, endTime: endTime, actor: actor});
 		this.noteHistory.push(new Note(pianoKey.keyNum, transportPosition));
 		
-		// Draw note on canvases
-		this.pianoCanvas.triggerDraw();
-		this.notesCanvas.addNoteBar(pianoKey, currTime, -1, actor);
-		
-		return transportPosition;
-	}
-	
-	releaseNote(pianoKey) {
-		// Check if `pianoKey` is in the `activeNotes` array, and if so release the note
-		const keyIndex = this.activeNotes.indexOf(pianoKey);
-		if (keyIndex > -1) {
-			this.sampler.triggerRelease(pianoKey.keyName, Tone.now() + 0.1);
-			this.activeNotes.splice(keyIndex, 1);
-			this.notesCanvas.releaseNote(pianoKey.keyNum, new Date());
+		let endTime = -1;
+		if (duration === -1) {
+			// Note is being held down
+			this.sampler.triggerAttack(pianoKey.keyName, time);
+		} else {
+			const triggerDuration = (duration / 1000) + 0.15; // Add a short delay to the end of the sound (in seconds)
+			this.sampler.triggerAttackRelease(pianoKey.keyName, triggerDuration, time);
+			
+			endTime = new Date(currTime);
+			endTime.setMilliseconds(endTime.getMilliseconds() + duration); // Key lights up for 150 milliseconds
 		}
-	}
-	
-	releaseAllNotes() {
-		for (const pianoKey of [...this.activeNotes]) {
-			this.releaseNote(pianoKey);
-		}
-	}
-	
-	playNote(pianoKey, actor, time, transportPosition=Tone.Transport.position) {
-		const currTime = new Date();
-		this.sampler.triggerAttackRelease(pianoKey.keyName, 0.3, time);
 		
-		const endTime = new Date(currTime);
-		endTime.setMilliseconds(endTime.getMilliseconds() + 200); // Key lights up for 200 milliseconds
-		this.pianoCanvas.activeKeys.push({key: pianoKey, endTime: endTime, actor: actor});
-		this.noteHistory.push(new Note(pianoKey.keyNum, transportPosition));
+		// Check if pianoKey is already active, and if so overwrite its `endTime`
+		const activeKey = this.activeKeys.find(obj => obj.key === pianoKey);
+		if (typeof activeKey === 'undefined') {
+			this.activeKeys.push({key: pianoKey, endTime: endTime, actor: actor});
+		} else {
+			activeKey.endTime = endTime;
+		}
 		
 		// Draw note on canvases
 		this.pianoCanvas.triggerDraw();
@@ -93,8 +74,26 @@ class Piano {
 		return transportPosition;
 	}
 	
+	releaseNote(pianoKey) {
+		// Check if `pianoKey` is in the `activeKeys` array, and if so release the note
+		const activeKey = this.activeKeys.find(obj => obj.key === pianoKey);
+		const keyIndex = this.activeKeys.indexOf(activeKey);
+		if (keyIndex > -1) {
+			this.sampler.triggerRelease(pianoKey.keyName, Tone.now() + 0.1);
+			this.activeKeys.splice(keyIndex, 1);
+			this.notesCanvas.releaseNote(pianoKey.keyNum, new Date());
+		}
+	}
+	
+	releaseAllNotes() {
+		const heldKeys = this.activeKeys.filter(obj => obj.endTime === -1);
+		for (const heldKey of heldKeys) {
+			this.releaseNote(heldKey.key);
+		}
+	}
+	
 	scheduleNote(pianoKey, triggerTime, actor) {
-		Tone.Transport.scheduleOnce((time) => this.playNote(pianoKey, actor, time, triggerTime), triggerTime);
+		Tone.Transport.scheduleOnce((time) => this.playNote(pianoKey, actor, 150, time, triggerTime), triggerTime);
 	}
 	
 	async callModel(customHistory) {
@@ -257,7 +256,6 @@ class PianoCanvas {
 		this.numWhiteKeys = 7 * this.octaves + 3; // 3 additional keys before and after main octaves
 		this.numBlackKeys = 5 * this.octaves + 1; // 1 additional key in the 0th octave
 		
-		this.activeKeys = [];
 		this.hoverKey = null;
 		this.prevHoverKey = null;
 		this.animationQueued = false;
@@ -367,7 +365,7 @@ class PianoCanvas {
 			this.triggerDraw();
 			if (globalMouseDown) {
 				this.piano.releaseNote(this.prevHoverKey);
-				this.piano.holdNote(this.hoverKey, Actor.Player);
+				this.piano.playNote(this.hoverKey, Actor.Player, -1);
 			}
 			this.prevHoverKey = this.hoverKey;
 		}
@@ -402,16 +400,16 @@ class PianoCanvas {
 		const [whiteKeyWidth, whiteKeyHeight, blackKeyWidth, blackKeyHeight] = [this.whiteKeyWidth, this.whiteKeyHeight, this.blackKeyWidth, this.blackKeyHeight];
 		
 		// Remove expired keys and get the colourKeyNums for active keys
-		this.activeKeys = this.activeKeys.filter((k) => k.endTime >= new Date());
+		this.piano.activeKeys = this.piano.activeKeys.filter((k) => k.endTime >= new Date() || k.endTime === -1);
 		function getActiveKeyNums(activeKeys, actor, getWhiteKey) {
 			return activeKeys.filter((k) => (k.key.isWhiteKey === getWhiteKey) && (k.actor === actor)).map((k) => k.key.colourKeyNum);
 		}
-		const activeWhiteKeysPlayer = getActiveKeyNums(this.activeKeys, Actor.Player, true);
-		const activeWhiteKeysModel = getActiveKeyNums(this.activeKeys, Actor.Model, true);
-		const activeWhiteKeysBot = getActiveKeyNums(this.activeKeys, Actor.Bot, true);
-		const activeBlackKeysPlayer = getActiveKeyNums(this.activeKeys, Actor.Player, false);
-		const activeBlackKeysModel = getActiveKeyNums(this.activeKeys, Actor.Model, false);
-		const activeBlackKeysBot = getActiveKeyNums(this.activeKeys, Actor.Bot, false);
+		const activeWhiteKeysPlayer = getActiveKeyNums(this.piano.activeKeys, Actor.Player, true);
+		const activeWhiteKeysModel = getActiveKeyNums(this.piano.activeKeys, Actor.Model, true);
+		const activeWhiteKeysBot = getActiveKeyNums(this.piano.activeKeys, Actor.Bot, true);
+		const activeBlackKeysPlayer = getActiveKeyNums(this.piano.activeKeys, Actor.Player, false);
+		const activeBlackKeysModel = getActiveKeyNums(this.piano.activeKeys, Actor.Model, false);
+		const activeBlackKeysBot = getActiveKeyNums(this.piano.activeKeys, Actor.Bot, false);
 		
 		for (let i = 0; i < this.numWhiteKeys; i++) {
 			ctx.fillStyle = PianoCanvas.keyFill.white.inactive;
@@ -452,7 +450,7 @@ class PianoCanvas {
 		}
 		
 		this.animationQueued = false;
-		if (this.activeKeys.length > 0) {
+		if (this.piano.activeKeys.length > 0) {
 			this.triggerDraw();
 		}
 	}
