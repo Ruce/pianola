@@ -214,7 +214,7 @@ def feature_tensor_to_str(feature_tensor):
             velocity = max(min(velocity, 99), 0)
 
             duration = round(tensor_slice[n, 1].item())
-            duration = max(min(duration, 99), 0)
+            duration = max(min(duration, 99), 1)
 
             slice_note_str += f"{n:02d}{velocity:02d}{duration:02d}"
         notes_list.append(slice_note_str)

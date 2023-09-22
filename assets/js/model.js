@@ -34,7 +34,7 @@ class PianolaModel {
 			if (p <= endTick) {
 				const t = Math.floor((p - startTick) / 48); // Delta between note and startTick in SixteenthNotes
 				const velocity = Math.max(Math.min(Math.round((n.velocity * 100) - 1), 99), 0); // Velocity scaled to be 0-indexed, between 0 and 99
-				const duration = Math.max(Math.min(n.duration, 99), 0);
+				const duration = Math.max(Math.min(Math.round(n.duration), 99), 1);
 				const noteStr = `${toPaddedNumber(n.keyNum)}${toPaddedNumber(velocity)}${toPaddedNumber(duration)}`;
 				orderedNotes[t].push(noteStr);
 			}
