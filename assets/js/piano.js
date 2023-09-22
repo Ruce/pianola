@@ -18,7 +18,7 @@ class Piano {
 		
 		this.bufferBeats = 4;
 		this.bufferTicks = Tone.Time(`0:${this.bufferBeats}`).toTicks();
-		this.historyWindowBeats = 28;
+		this.historyWindowBeats = 36;
 		this.defaultBPM = 88;
 		this.setBPM(this.defaultBPM);
 	}
@@ -52,7 +52,7 @@ class Piano {
 			// Note is being held down
 			this.sampler.triggerAttack(pianoKey.keyName, time, velocity);
 		} else {
-			const durationMilliseconds = ((duration * 60 * 1000) / (this.bpm * 4)) * 0.9 - 10; // Shorten duration slightly to add a gap between notes
+			const durationMilliseconds = ((duration * 60 * 1000) / (this.bpm * 4)) * 0.9 - 15; // Shorten duration slightly to add a gap between notes
 			const triggerDuration = (durationMilliseconds / 1000) + 0.15; // Add a short delay to the end of the sound (in seconds)
 			this.sampler.triggerAttackRelease(pianoKey.keyName, triggerDuration, time, velocity);
 			
