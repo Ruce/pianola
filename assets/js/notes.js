@@ -32,7 +32,7 @@ class NoteBar {
 		this.actor = actor;
 		
 		this.relativeTop = 1;
-		this.relativeBot = 1.005;
+		this.relativeBot = 1;
 	}
 	
 	static get fill() {
@@ -41,6 +41,10 @@ class NoteBar {
 			model: { white: '#BEFCFF', black: '#5EBBBF', shadow: '#7DF9FF'},
 			bot: { white: '#C6FEE2', black: '#59DD9C', shadow: '#79FDBC'}
 		};
+	}
+	
+	static get minRelHeight() {
+		return 0.005;
 	}
 }
 
@@ -106,14 +110,14 @@ class NotesCanvas {
 			
 			for (const n of this.activeBars) {
 				const yDelta = (currTime - n.lastUpdateTime) / noteLongevity;
-				n.relativeTop = Math.max(n.relativeTop - yDelta, 0);
+				n.relativeTop = Math.max(n.relativeTop - yDelta, -NoteBar.minRelHeight*2);
 				if (n.endTime <= currTime && n.endTime != -1) {
-					n.relativeBot = Math.max(n.relativeBot - yDelta, 0);
+					n.relativeBot = Math.max(n.relativeBot - yDelta, -NoteBar.minRelHeight*2);
 				}
 				const rectX = n.relativeX * this.canvas.width;
 				const rectY = n.relativeTop * this.canvas.height;
 				const noteWidth = n.isWhiteKey ? this.piano.pianoCanvas.whiteKeyWidth : this.piano.pianoCanvas.blackKeyWidth;
-				const noteHeight = (n.relativeBot - n.relativeTop) * this.canvas.height;
+				const noteHeight = Math.max(n.relativeBot - n.relativeTop, NoteBar.minRelHeight) * this.canvas.height;
 				
 				if (n.actor === Actor.Player) {
 					ctx.fillStyle = n.isWhiteKey ? NoteBar.fill.player.white : NoteBar.fill.player.black;
@@ -126,11 +130,10 @@ class NotesCanvas {
 					ctx.shadowColor = NoteBar.fill.model.shadow;
 				}
 				ctx.beginPath();
-				ctx.roundRect(rectX, rectY, noteWidth, noteHeight, 3);
+				ctx.roundRect(rectX, rectY, noteWidth, noteHeight, 6);
 				ctx.fill();
 				
-				//if (rectY + noteHeight + shadowBlur > 0) {
-				if (n.relativeBot > 0) {
+				if (n.relativeBot > -NoteBar.minRelHeight*2) {
 					n.lastUpdateTime = currTime;
 					newActiveBars.push(n);
 				}
