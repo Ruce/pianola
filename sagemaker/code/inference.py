@@ -139,13 +139,20 @@ class ChainClassifier(nn.Module):
         labels_shape[-1] = self.num_notes + self.chain_length
         labels = torch.zeros(labels_shape).to(device)
 
+        # Memoise the encoding of an all zeros label chain since it is most common
+        allzeros_l = F.relu(self.chain_linear1(labels[..., :self.chain_length]))
+        allzeros_l = self.chain_linear2(allzeros_l)
+        allzeros_h = torch.cat((x, allzeros_l), dim=-1)
+
         for n in range(self.num_notes):
             # Encode the previous labels
             note_links = labels[..., n:n+self.chain_length]
-            note_l = F.relu(self.chain_linear1(note_links))
-            note_l = self.chain_linear2(note_l)
-
-            h = torch.cat((x, note_l), dim=-1)
+            if (note_links == 0).all():
+                h = allzeros_h
+            else:
+                note_l = F.relu(self.chain_linear1(note_links))
+                note_l = self.chain_linear2(note_l)
+                h = torch.cat((x, note_l), dim=-1)
             note_pred = self.note_classifiers[n](h).squeeze(dim=-1)
             labels[..., n+self.chain_length] = torch.bernoulli(torch.sigmoid(note_pred))
 
@@ -181,12 +188,15 @@ class LalaE(nn.Module):
         duration_pred = self.duration(lalama_out[0])
         return (note_pred, velocity_pred, duration_pred)
 
-    def forward(self, source, past_key_values=None):
+    def forward(self, source, past_key_values=None, last_step_only=False):
         src = self.incep(source)
         lalama_out = self.lalama(src, past_key_values)
-        note_pred = self.chain(lalama_out[0])
-        velocity_pred = torch.clamp(self.velocity(lalama_out[0]), min=0, max=1)
-        duration_pred = torch.clamp(self.duration(lalama_out[0]), min=0)
+        representation = lalama_out[0]
+        if last_step_only:
+            representation = representation[:, -1:]
+        note_pred = self.chain(representation)
+        velocity_pred = torch.clamp(self.velocity(representation), min=0, max=1)
+        duration_pred = torch.clamp(self.duration(representation), min=0)
         output = (note_pred, velocity_pred, duration_pred, lalama_out[1]) if self.config.use_cache and not self.training else (note_pred, velocity_pred, duration_pred)
         return output
 
@@ -246,15 +256,13 @@ def generate_music(model, seed, timesteps):
     with torch.no_grad():
         past_key_values = None
         for i in range(timesteps):
-            note_pred, velocity_pred, duration_pred, past_key_values = model(source, past_key_values)
+            note_pred, velocity_pred, duration_pred, past_key_values = model(source, past_key_values, last_step_only=True)
             # Use note_pred as a mask to select feature values
             velocity = note_pred * velocity_pred
             duration = note_pred * duration_pred
-            pred = torch.stack((velocity, duration), dim=-1)
-            new_notes = pred[:, -1].squeeze(dim=0) # Keep only the last timestep and remove batch_size dimension
-            generated.append(new_notes)
-            source = new_notes.unsqueeze(dim=0).unsqueeze(dim=0) # Add batch and timestep dimensions
-    return torch.stack(generated, dim=0)
+            source = torch.stack((velocity, duration), dim=-1)
+            generated.append(source)
+    return torch.cat(generated, dim=1).squeeze(dim=0) # Remove the batch dimension
 
 # defining model and loading weights to it.
 def model_fn(model_dir):
