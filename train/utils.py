@@ -409,7 +409,7 @@ class MidiUtil():
     compress_factor = MidiUtil.calculate_compress_factor(orig_tpb, compressed_tpb)
 
     prev_tick = 0
-    notes_remaining_t = torch.zeros(tensor.shape[1]).to(device) # Number of timesteps that each note remains active/pressed
+    notes_remaining_t = torch.zeros(tensor.shape[1]).to(DEVICE) # Number of timesteps that each note remains active/pressed
     for t in range(tensor.shape[0]):
       curr_tick = t * compress_factor
 
