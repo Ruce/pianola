@@ -5,6 +5,7 @@ import numpy as np
 import random
 import torch
 import torch.nn.functional as F
+from mido.midifiles.tracks import merge_tracks
 from torch.utils.data import Dataset
 from scipy.stats import circmean, circvar
 
@@ -110,41 +111,42 @@ class MidiUtil():
     max_timesteps = MidiUtil.get_midi_timesteps(filename)
     # 128 notes as in MIDI specifications; last dimension is (velocity, duration)
     output = np.zeros((max_timesteps, 128, 2))
-    for track in midi.tracks:
-      t = 0
-      sustain_active = False
-      notes_last_active = np.full((128), -1, dtype=int)
-      notes_is_held = np.full((128), False, dtype=bool)
-      for msg in track:
-        t += msg.time
-        if msg.type == 'control_change' and msg.control == 64:
-          if msg.value >= 64 and not sustain_active:
-            # Sustain pedal activated
-            sustain_active = True
-          elif msg.value < 64 and sustain_active:
-            # Sustain pedal deactivated; for notes that are not held down but are active, deactivate them
-            sustain_active = False
-            notes_to_deactivate = (np.invert(notes_is_held) * (notes_last_active != -1)).nonzero()[0]
-            deactivate_notes(notes_last_active, notes_to_deactivate, t)
+    merged_track = merge_tracks(midi.tracks)
 
-        # Whether the note is turned on or off, record the duration since last activity
-        # Notes are not guaranteed to be toggled, e.g. a note that is already on can be turned on again
-        if msg.type == 'note_on' or msg.type == 'note_off':
-          last_active = notes_last_active[msg.note] # Timestep when this note was most recently activated
-          if last_active != -1:
-            note_duration = t - last_active
-            output[last_active, msg.note, 1] = note_duration # Record the duration at the timestep it was activated
-          
-          if msg.type == 'note_on' and msg.velocity > 0:
-            output[t, msg.note, 0] = msg.velocity / 100
-            notes_last_active[msg.note] = t
-            notes_is_held[msg.note] = True
-          else:
-            notes_is_held[msg.note] = False
-            if not sustain_active:
-              notes_last_active[msg.note] = -1
-      still_active = (notes_last_active != -1).nonzero()[0]
-      deactivate_notes(notes_last_active, still_active, t)
+    t = 0
+    sustain_active = False
+    notes_last_active = np.full((128), -1, dtype=int)
+    notes_is_held = np.full((128), False, dtype=bool)
+    for msg in merged_track:
+      t += msg.time
+      if msg.type == 'control_change' and msg.control == 64:
+        if msg.value >= 64 and not sustain_active:
+          # Sustain pedal activated
+          sustain_active = True
+        elif msg.value < 64 and sustain_active:
+          # Sustain pedal deactivated; for notes that are not held down but are active, deactivate them
+          sustain_active = False
+          notes_to_deactivate = (np.invert(notes_is_held) * (notes_last_active != -1)).nonzero()[0]
+          deactivate_notes(notes_last_active, notes_to_deactivate, t)
+
+      # Whether the note is turned on or off, record the duration since last activity
+      # Notes are not guaranteed to be toggled, e.g. a note that is already on can be turned on again
+      if msg.type == 'note_on' or msg.type == 'note_off':
+        last_active = notes_last_active[msg.note] # Timestep when this note was most recently activated
+        if last_active != -1:
+          note_duration = t - last_active
+          output[last_active, msg.note, 1] = note_duration # Record the duration at the timestep it was activated
+        
+        if msg.type == 'note_on' and msg.velocity > 0:
+          output[t, msg.note, 0] = msg.velocity / 100
+          notes_last_active[msg.note] = t
+          notes_is_held[msg.note] = True
+        else:
+          notes_is_held[msg.note] = False
+          if not sustain_active:
+            notes_last_active[msg.note] = -1
+    still_active = (notes_last_active != -1).nonzero()[0]
+    deactivate_notes(notes_last_active, still_active, t)
     return torch.from_numpy(output)
 
   def to_binary_velocity_tensor(tensor):
