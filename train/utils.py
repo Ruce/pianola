@@ -93,6 +93,13 @@ class MidiUtil():
     '''
       Returns a tensor of shape [timesteps, num_notes, 2], where the last dimension is (velocity, duration)
     '''
+    def deactivate_notes(notes_last_active, notes_to_deactivate, t):
+      for idx in notes_to_deactivate:
+        last_active = notes_last_active[idx]
+        note_duration = t - last_active
+        output[last_active, idx, 1] = note_duration
+        notes_last_active[idx] = -1
+    
     midi = mido.MidiFile(filename)
 
     # Three types of MIDI files (0, 1, 2)
@@ -105,11 +112,23 @@ class MidiUtil():
     output = np.zeros((max_timesteps, 128, 2))
     for track in midi.tracks:
       t = 0
+      sustain_active = False
       notes_last_active = np.full((128), -1, dtype=int)
+      notes_is_held = np.full((128), False, dtype=bool)
       for msg in track:
         t += msg.time
+        if msg.type == 'control_change' and msg.control == 64:
+          if msg.value >= 64 and not sustain_active:
+            # Sustain pedal activated
+            sustain_active = True
+          elif msg.value < 64 and sustain_active:
+            # Sustain pedal deactivated; for notes that are not held down but are active, deactivate them
+            sustain_active = False
+            notes_to_deactivate = (np.invert(notes_is_held) * (notes_last_active != -1)).nonzero()[0]
+            deactivate_notes(notes_last_active, notes_to_deactivate, t)
+
         # Whether the note is turned on or off, record the duration since last activity
-        # Note are not guaranteed to be toggled, e.g. a note that is already on can be turned on again
+        # Notes are not guaranteed to be toggled, e.g. a note that is already on can be turned on again
         if msg.type == 'note_on' or msg.type == 'note_off':
           last_active = notes_last_active[msg.note] # Timestep when this note was most recently activated
           if last_active != -1:
@@ -119,13 +138,13 @@ class MidiUtil():
           if msg.type == 'note_on' and msg.velocity > 0:
             output[t, msg.note, 0] = msg.velocity / 100
             notes_last_active[msg.note] = t
+            notes_is_held[msg.note] = True
           else:
-            notes_last_active[msg.note] = -1
+            notes_is_held[msg.note] = False
+            if not sustain_active:
+              notes_last_active[msg.note] = -1
       still_active = (notes_last_active != -1).nonzero()[0]
-      for idx in still_active:
-        last_active = notes_last_active[idx]
-        note_duration = t - last_active
-        output[last_active, idx, 1] = note_duration
+      deactivate_notes(notes_last_active, still_active, t)
     return torch.from_numpy(output)
 
   def to_binary_velocity_tensor(tensor):
@@ -222,6 +241,55 @@ class MidiUtil():
       prev_best_int = best_int
     return torch.stack(compressed_vectors)
 
+  def dynamic_compress_timed_tensor(tensor, desired_tpb):
+    '''
+      `tensor`: shape (num_timesteps, num_notes, 2), where last dimension are features (velocity, duration)
+    '''
+    start_interval = 40       # Minimum ticks per 1/8th beat to analyse
+    end_interval = 64         # Maximum ticks per 1/8th beat to analyse
+    w = 3840                  # Window range for each slice to be processed
+    min_notes_in_window = 12  # Minimum number of notes within a window `w` to calculate new tpb
+    max_dispersion_diff = 0.1 # Threshold between best tpb and previous window's tpb dispersions to change tpb
+
+    # Get the timings where notes are played; multiple notes at the same timestep are only counted once
+    note_timings = torch.nonzero(torch.sum(tensor[:, :, 0], dim=1) != 0, as_tuple=True)[0].tolist()
+    start_w = 0
+    prev_best_int = None
+    compressed_vectors = []
+    while start_w < len(tensor):
+      end_w = start_w + w
+      timings = MidiUtil.get_timings_in_range(note_timings, start_w, end_w)
+      while len(timings) < min_notes_in_window and end_w < len(tensor):
+        end_w += w
+        timings = MidiUtil.get_timings_in_range(note_timings, start_w, end_w)
+      best_int = calc_best_interval(timings, start_interval, end_interval)
+
+      if best_int != prev_best_int and prev_best_int is not None:
+        best_dispersion = calc_dispersion(timings, best_int)
+        for i in [0, -1, 1, -2, 2]:
+          alt_dispersion = calc_dispersion(timings, prev_best_int + i)
+          if alt_dispersion - best_dispersion < max_dispersion_diff:
+            best_int = prev_best_int + i
+            break
+
+      tpb = best_int * 8
+      compress_factor = MidiUtil.calculate_compress_factor(tpb, desired_tpb)
+      for start in range(start_w, min(end_w, len(tensor)), compress_factor):
+        end = start + compress_factor
+        tensor_slice = tensor[start:end]
+        slice_velocities = tensor_slice[:, :, 0]
+        slice_durations = tensor_slice[:, :, 1]
+
+        # Get the highest duration per note and its corresponding velocity, in case the same note is played more than once in this window
+        values, indices = slice_durations.max(dim=0)
+        max_velocities = slice_velocities[indices, torch.arange(slice_velocities.shape[1])]
+        max_durations = values / compress_factor
+        compressed = torch.stack([max_velocities, max_durations], dim=1).float()
+        compressed_vectors.append(compressed)
+      start_w = end
+      prev_best_int = best_int
+    return torch.stack(compressed_vectors)
+  
   def compress_timed_tensor(tensor, orig_tpb, desired_tpb):
     '''
     Reduces the fidelity of the musical tensor, i.e. merge multiple timesteps into one step
@@ -323,6 +391,55 @@ class MidiUtil():
         new_message = mido.Message('note_on', note=n, velocity=0, time=time_delta)
         track.append(new_message)
         prev_t = t+1 # Update prev_t to t+1 since the notes are turned off 1 timestep later
+
+    # Save the MIDI file
+    mid.save(filename)
+    return mid
+    
+  def feature_tensor_to_midi(tensor, filename, orig_tpb, compressed_tpb):
+    '''
+      `tensor`: shape (num_timesteps, num_notes, 2), where the last dimension are features (velocity, duration)
+    '''
+    mid = mido.MidiFile()
+    mid.ticks_per_beat = orig_tpb
+    track = mido.MidiTrack()
+    mid.tracks.append(track)
+    track.append(mido.Message('program_change', program=1))
+
+    compress_factor = MidiUtil.calculate_compress_factor(orig_tpb, compressed_tpb)
+
+    prev_tick = 0
+    notes_remaining_t = torch.zeros(tensor.shape[1]).to(device) # Number of timesteps that each note remains active/pressed
+    for t in range(tensor.shape[0]):
+      curr_tick = t * compress_factor
+
+      # Check if any notes need to be turned off at this timestep
+      off_notes = torch.nonzero((notes_remaining_t != 0) * (notes_remaining_t <= 1), as_tuple=True)[0].tolist()
+      for n in off_notes:
+        time_delta = curr_tick - prev_tick
+        track.append(mido.Message('note_on', note=n, velocity=0, time=time_delta))
+        prev_tick = curr_tick
+      # Decrement all remaining times
+      notes_remaining_t = torch.clamp(notes_remaining_t - 1, min=0)
+
+      # Notes that are turned on at this timestep
+      active_notes = torch.nonzero(tensor[t, :, 0], as_tuple=True)[0].tolist()
+      for n in active_notes:
+        time_delta = curr_tick - prev_tick
+        # If the note was still active, turn it off before turning it on again
+        if notes_remaining_t[n] > 0:
+          track.append(mido.Message('note_on', note=n, velocity=0, time=time_delta))
+          time_delta = 0
+        velocity = int(tensor[t, n, 0] * 100)
+        notes_remaining_t[n] = tensor[t, n, 1]
+        track.append(mido.Message('note_on', note=n, velocity=velocity, time=time_delta))
+        prev_tick = curr_tick
+
+    # Turn off all remaining notes
+    remaining_notes = torch.nonzero(notes_remaining_t, as_tuple=True)[0].tolist()
+    for i, n in enumerate(remaining_notes):
+      time_delta = compress_factor if i == 0 else 0
+      track.append(mido.Message('note_on', note=n, velocity=0, time=time_delta))
 
     # Save the MIDI file
     mid.save(filename)
