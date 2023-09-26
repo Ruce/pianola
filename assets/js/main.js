@@ -19,15 +19,30 @@ function hideLoader() {
 	document.getElementById('loaderCircle').classList.add('complete');
 	document.getElementById('loaderText').classList.add('complete');
 	document.getElementById('loaderCheckmark').classList.add('draw');
-	setTimeout(() => document.getElementById("connectionLoader").style.display = "none", 1700);
+	setTimeout(() => document.getElementById("connectionLoader").style.display = "none", 1800);
 }
 
 function initialisePage() {
+	NProgress.configure({ showSpinner: false });
+	NProgress.start();
+	
 	model = new PianolaModel(endpointBaseUrl);
 	model.connectToModel(hideLoader);
 	piano = new Piano('pianoCanvas', octaves, model);
 	notesCanvas = new NotesCanvas('notesCanvas', piano);
 	initialiseVolumeSlider();
+	fetchSongExamples();
+	
+	Tone.ToneAudioBuffer.loaded().then(() => {
+		NProgress.set(0.8);
+		setTimeout(() => loadingComplete(), 500);
+	});
+}
+
+function loadingComplete() {
+	document.getElementById('content').style.display = 'block';
+	document.getElementById('preloader').classList.add('fade-out');
+	NProgress.done()
 }
 
 function redrawCanvases() {
@@ -56,6 +71,15 @@ function initialiseVolumeSlider() {
 	});
 }
 
+function fetchSongExamples() {
+	fetch('assets/songs/examples.json')
+	.then(response => response.json())
+	.then(data => exampleSongs = data)
+	.catch(error => {
+		console.log('Error reading song examples JSON:', error);
+	});
+}
+
 function toggleMute() {
 	const volumeSlider = document.getElementById('volumeSlider');
 	const volumeButtonImage = document.getElementById('volumeButtonImage');
@@ -79,22 +103,12 @@ function stopMusic() {
 	}
 }
 
-function fetchSongExamples() {
-	fetch('assets/songs/examples.json')
-	.then(response => response.json())
-	.then(data => exampleSongs = data)
-	.catch(error => {
-		console.log('Error reading song examples JSON:', error);
-	});
-}
-
 function playExample(exampleNum) {
 	const song = exampleSongs.songs[exampleNum-1];
 	piano.playExample(song.data, song.bpm);
 }
 
 document.addEventListener("DOMContentLoaded", initialisePage);
-document.addEventListener("DOMContentLoaded", fetchSongExamples);
 document.addEventListener("mouseup", () => globalMouseDown = false);
 
 var resizeTimeout = false;
