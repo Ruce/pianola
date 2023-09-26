@@ -45,7 +45,7 @@ class PianolaModel {
 	}
 	
 	async queryModel(queryString) {
-		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString, timesteps: 16});
+		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString, timesteps: 16, num_repeats: 1});
 		try {
 			const response = await fetch(endpointURI);
 			const data = await response.json();

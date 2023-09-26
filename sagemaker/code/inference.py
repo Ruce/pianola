@@ -1,3 +1,5 @@
+import math
+import random
 import json
 import logging
 import sys
@@ -245,11 +247,11 @@ def notes_str_to_feature_tensor(notes_str, num_notes):
                 notes_tensor[t, note_num, 1] = duration
     return notes_tensor
 
-def generate_music(model, seed, timesteps):
+def generate_music(model, seed, timesteps, num_repeats=1):
     '''
         Input `seed` and output shapes: (timesteps, num_notes, 2), where the last dimension has features (velocity, duration)
     '''
-    source = seed.unsqueeze(dim=0)
+    source = seed.unsqueeze(dim=0).repeat(num_repeats, 1, 1, 1)
     generated = []
 
     model.eval()
@@ -262,7 +264,14 @@ def generate_music(model, seed, timesteps):
             duration = note_pred * duration_pred
             source = torch.stack((velocity, duration), dim=-1)
             generated.append(source)
-    return torch.cat(generated, dim=1).squeeze(dim=0) # Remove the batch dimension
+    generated = torch.cat(generated, dim=1)
+
+    # To reduce sudden silences, remove the samples with the lowest number of active timesteps
+    num_timesteps = generated.sum(dim=(-1, -2)).count_nonzero(dim=1) # Number of timesteps with active notes in each sample
+    discard = math.floor(num_repeats / 2)
+    samples_to_keep = num_timesteps.argsort()[discard:]
+    sample_num = samples_to_keep[random.randint(0, len(samples_to_keep)-1)]
+    return generated[sample_num]
 
 # defining model and loading weights to it.
 def model_fn(model_dir):
@@ -295,16 +304,18 @@ def input_fn(request_body, request_content_type):
     request_json = json.loads(request_body)
     notes_str = request_json["inputs"]
     timesteps = request_json["timesteps"]
+    num_repeats = request_json["num_repeats"]
     data = notes_str_to_feature_tensor(notes_str, num_notes=NUM_NOTES)
-    return {'data': data, 'timesteps': timesteps}
+    return {'data': data, 'timesteps': timesteps, 'num_repeats': num_repeats}
 
 
 # inference
 def predict_fn(input_object, model):
     timesteps = int(input_object['timesteps'])
+    num_repeats = int(input_object['num_repeats'])
     # Trim input_object['data'] tensor to a maximum length of WINDOW_SIZE
     seed = input_object['data'][-WINDOW_SIZE:]
-    prediction = generate_music(model, seed, timesteps)
+    prediction = generate_music(model, seed, timesteps, num_repeats)
     return prediction
 
 
