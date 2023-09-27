@@ -446,6 +446,24 @@ class MidiUtil():
     # Save the MIDI file
     mid.save(filename)
     return mid
+    
+  def trim_leading_trailing_zeros(tensor):
+    '''
+      `tensor`: shape (num_timesteps, *)
+    '''
+    length = len(tensor)
+    start = 0
+    end = length
+    for i in range(length):
+      if tensor[i].sum() != 0:
+        start = i
+        break
+    
+    for j in range(length-1, 0, -1):
+      if tensor[j].sum() != 0:
+        end = j + 1
+        break
+    return tensor[start:end]
 
 
 class TonnetzUtil():
