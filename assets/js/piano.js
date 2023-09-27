@@ -130,6 +130,7 @@ class Piano {
 			this.callModel(customHistory); // Call model immediately, since setInterval first triggers function after the delay
 			this.callModelIntervalId = setInterval(() => this.callModel(), this.callModelSeconds*1000);
 			this.checkActivityIntervalId = setInterval(() => this.checkActivity(), 5000);
+			this.notesCanvas.startGlow(this.callModelSeconds*1000);
 		}
 	}
 	
@@ -138,6 +139,7 @@ class Piano {
 		this.awaitingPlayerInput = true;
 		this.lastSeedInputPosition = null;
 		this.callModelInitial = null;
+		this.notesCanvas.endGlow();
 		
 		this.noteHistory = [];
 		this.model.noteHistory = [];
