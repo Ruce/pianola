@@ -307,3 +307,77 @@ canvas {
 		opacity: 1;
   }
 }
+
+
+#overlay {
+	display: block;
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: rgba(0, 0, 0, 0.8);
+	z-index: 1;
+}
+
+#introduction {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+}
+
+#introduction > h2 {
+	color: #5EBBBF;
+}
+
+#introGoButton {
+	border: none;
+	background: #5EBBBF;
+	color: white;
+	padding: 10px 30px;
+	border-radius: 10px;
+	cursor: pointer;
+	font-size: 16px;
+	font-weight: bold;
+}
+
+#closeIntroButton {
+	position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 30px;
+    height: 30px;
+    background: #bbb;
+    border: none;
+    cursor: pointer;
+    border-radius: 50%;
+    font-size: 0;
+    text-align: center;
+}
+
+#closeIntroButton::before,
+#closeIntroButton::after {
+    content: "";
+    position: absolute;
+	top: 7px;
+	left: 14px;
+    width: 2px;
+    height: 16px;
+    background: white;
+}
+
+#closeIntroButton::before {
+    transform: rotate(45deg);
+}
+
+#closeIntroButton::after {
+    transform: rotate(-45deg);
+}
+
+
+

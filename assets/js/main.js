@@ -108,6 +108,10 @@ function playExample(exampleNum) {
 	piano.playExample(song.data, song.bpm);
 }
 
+function closeOverlay() {
+    document.getElementById('overlay').style.display = 'none';
+}
+
 document.addEventListener("DOMContentLoaded", initialisePage);
 document.addEventListener("mouseup", () => globalMouseDown = false);
 
