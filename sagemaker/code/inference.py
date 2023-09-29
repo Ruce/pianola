@@ -116,6 +116,30 @@ class ChainClassifier(nn.Module):
         self.note_classifiers = torch.nn.ModuleList()
         for _ in range(num_notes):
             self.note_classifiers.append(NoteClassifier(x_dim, emb_dim, chain_length))
+        self.conv1 = nn.Conv1d((x_dim + chain_length) * num_notes, emb_dim * num_notes, kernel_size=1, groups=num_notes)
+        self.conv2 = nn.Conv1d(emb_dim * num_notes, num_notes, kernel_size=1, groups=num_notes)
+        self.update_conv_weights()
+
+    def update_conv_weights(self):
+        weights_1 = []
+        biases_1 = []
+        weights_2 = []
+        biases_2 = []
+        for classifier in self.note_classifiers:
+            weights_1.append(classifier.note_linear1.weight)
+            biases_1.append(classifier.note_linear1.bias)
+            weights_2.append(classifier.note_linear2.weight)
+            biases_2.append(classifier.note_linear2.bias)
+
+        weights_1 = torch.cat(weights_1, dim=0).unsqueeze(dim=-1)
+        biases_1 = torch.cat(biases_1, dim=0)
+        weights_2 = torch.cat(weights_2, dim=0).unsqueeze(dim=-1)
+        biases_2 = torch.cat(biases_2, dim=0)
+
+        self.conv1.weight = nn.Parameter(weights_1)
+        self.conv1.bias = nn.Parameter(biases_1)
+        self.conv2.weight = nn.Parameter(weights_2)
+        self.conv2.bias = nn.Parameter(biases_2)
 
     def train_model(self, x, labels):
         assert labels.shape[-1] == self.num_notes
@@ -146,17 +170,25 @@ class ChainClassifier(nn.Module):
         allzeros_l = self.chain_linear2(allzeros_l)
         allzeros_h = torch.cat((x, allzeros_l), dim=-1)
 
+        # Flatten the batch and timestep dimensions into first dimension
+        if len(x.shape) == 3:
+            allzeros_h = allzeros_h.reshape((x.shape[0] * x.shape[1], -1))
+        allzeros_h = allzeros_h.repeat((1, self.num_notes)).unsqueeze(dim=-1)
+        allzeros_prob = self.conv2(F.relu(self.conv1(allzeros_h))).squeeze(dim=-1)
+        if len(x.shape) == 3:
+            zero_pred = torch.sigmoid(allzeros_prob.reshape((x.shape[0], x.shape[1], -1)))
+
         for n in range(self.num_notes):
             # Encode the previous labels
             note_links = labels[..., n:n+self.chain_length]
             if (note_links == 0).all():
-                h = allzeros_h
+                note_pred = zero_pred[..., n]
             else:
                 note_l = F.relu(self.chain_linear1(note_links))
                 note_l = self.chain_linear2(note_l)
                 h = torch.cat((x, note_l), dim=-1)
-            note_pred = self.note_classifiers[n](h).squeeze(dim=-1)
-            labels[..., n+self.chain_length] = torch.bernoulli(torch.sigmoid(note_pred))
+                note_pred = torch.sigmoid(self.note_classifiers[n](h).squeeze(dim=-1))
+            labels[..., n+self.chain_length] = torch.bernoulli(note_pred)
 
         # Remove padding and return predicted labels
         return labels[..., self.chain_length:]
@@ -247,11 +279,11 @@ def notes_str_to_feature_tensor(notes_str, num_notes):
                 notes_tensor[t, note_num, 1] = duration
     return notes_tensor
 
-def generate_music(model, seed, timesteps, num_repeats=1):
+def generate_music(model, seed, timesteps):
     '''
         Input `seed` and output shapes: (timesteps, num_notes, 2), where the last dimension has features (velocity, duration)
     '''
-    source = seed.unsqueeze(dim=0).repeat(num_repeats, 1, 1, 1)
+    source = seed.unsqueeze(dim=0)
     generated = []
 
     model.eval()
@@ -264,14 +296,7 @@ def generate_music(model, seed, timesteps, num_repeats=1):
             duration = note_pred * duration_pred
             source = torch.stack((velocity, duration), dim=-1)
             generated.append(source)
-    generated = torch.cat(generated, dim=1)
-
-    # To reduce sudden silences, remove the samples with the lowest number of active timesteps
-    num_timesteps = generated.sum(dim=(-1, -2)).count_nonzero(dim=1) # Number of timesteps with active notes in each sample
-    discard = math.floor(num_repeats / 2)
-    samples_to_keep = num_timesteps.argsort()[discard:]
-    sample_num = samples_to_keep[random.randint(0, len(samples_to_keep)-1)]
-    return generated[sample_num]
+    return torch.cat(generated, dim=1).squeeze(dim=0)
 
 # defining model and loading weights to it.
 def model_fn(model_dir):
@@ -304,18 +329,16 @@ def input_fn(request_body, request_content_type):
     request_json = json.loads(request_body)
     notes_str = request_json["inputs"]
     timesteps = request_json["timesteps"]
-    num_repeats = request_json["num_repeats"]
     data = notes_str_to_feature_tensor(notes_str, num_notes=NUM_NOTES)
-    return {'data': data, 'timesteps': timesteps, 'num_repeats': num_repeats}
+    return {'data': data, 'timesteps': timesteps}
 
 
 # inference
 def predict_fn(input_object, model):
     timesteps = int(input_object['timesteps'])
-    num_repeats = int(input_object['num_repeats'])
     # Trim input_object['data'] tensor to a maximum length of WINDOW_SIZE
     seed = input_object['data'][-WINDOW_SIZE:]
-    prediction = generate_music(model, seed, timesteps, num_repeats)
+    prediction = generate_music(model, seed, timesteps)
     return prediction
 
 

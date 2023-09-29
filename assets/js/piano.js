@@ -169,7 +169,7 @@ class Piano {
 	}
 	
 	seedInputAwaiter() {
-		if (new Date() - this.lastActivity > 2000) {
+		if (new Date() - this.lastActivity > 2000 && !globalMouseDown) {
 			clearInterval(this.listenerIntervalId);
 			
 			// Rewind the transport schedule to the last of the seed input so that the history fed to the model is seamless
@@ -369,7 +369,7 @@ class PianoCanvas {
 			this.triggerDraw();
 			if (globalMouseDown) {
 				this.piano.releaseNote(this.prevHoverKey);
-				this.piano.playNote(this.hoverKey, 0.7, -1, Actor.Player);
+				this.piano.keyPressed(hoverKeyNum);
 			}
 			this.prevHoverKey = this.hoverKey;
 		}
@@ -380,6 +380,7 @@ class PianoCanvas {
 		this.prevHoverKey = null;
 		this.piano.releaseAllNotes();
 		this.triggerDraw();
+		this.piano.lastActivity = new Date();
 	}
 	
 	triggerDraw() {
