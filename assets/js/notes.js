@@ -125,7 +125,7 @@ class NotesCanvas {
 		const ctx = this.canvas.getContext('2d');
 		this.canvas.width = window.innerWidth;
 		this.canvas.height = window.innerHeight - this.piano.pianoCanvas.canvas.height;
-		ctx.fillStyle = '#222222';
+		ctx.fillStyle = '#333333';
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		
 		// Debug placeholder square to see if animations are fired

@@ -1,22 +1,25 @@
 $backgroundColor: #000000;
 $bodyColor: #000000;
+$lightBlueColor: #5EBBBF;
+$whiteColor: #FEFEFE;
+$menuBackgroundColor: #595959;
 $bodyFont: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
 
 body {
-  background: $backgroundColor;
-  color: $bodyColor;
-  font-family: $bodyFont;
+	background: $backgroundColor;
+	color: $bodyColor;
+	font-family: $bodyFont;
 }
 
 html, body {
-  margin: 0;
-  overflow: hidden;
+	margin: 0;
+	overflow: hidden;
 }
 
 canvas {
-  margin: 0;
-  padding: 0;
-  vertical-align: top;
+	margin: 0;
+	padding: 0;
+	vertical-align: top;
 }
 
 #content {
@@ -45,187 +48,213 @@ canvas {
 }
 
 .lds-preloader {
-  display: inline-block;
-  position: relative;
-  width: 80px;
-  height: 80px;
+	display: inline-block;
+	position: relative;
+	width: 80px;
+	height: 80px;
 }
 .lds-preloader div {
-  display: inline-block;
-  position: absolute;
-  left: 8px;
-  width: 16px;
-  background: #FEFEFE;
-  animation: lds-preloader 1.2s cubic-bezier(0, 0.5, 0.5, 1) infinite;
+	display: inline-block;
+	position: absolute;
+	left: 8px;
+	width: 16px;
+	background: $whiteColor;
+	animation: lds-preloader 1.2s cubic-bezier(0, 0.5, 0.5, 1) infinite;
 }
 .lds-preloader div:nth-child(1) {
-  left: 8px;
-  animation-delay: -0.24s;
+	left: 8px;
+	animation-delay: -0.24s;
 }
 .lds-preloader div:nth-child(2) {
-  left: 32px;
-  animation-delay: -0.12s;
+	left: 32px;
+	animation-delay: -0.12s;
 }
 .lds-preloader div:nth-child(3) {
-  left: 56px;
-  animation-delay: 0;
+	left: 56px;
+	animation-delay: 0;
 }
 @keyframes lds-preloader {
-  0% {
-    top: 8px;
-    height: 64px;
-  }
-  50%, 100% {
-    top: 24px;
-    height: 32px;
-  }
+	0% {
+		top: 8px;
+		height: 64px;
+	}
+	50%, 100% {
+		top: 24px;
+		height: 32px;
+	}
 }
 
 .canvasContainer {
-  display: block;
-  overflow: hidden;
+	display: block;
+	overflow: hidden;
 }
 
 .menuContainer {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 230px;
-  height: 30px;
-  background-color: #595959;
-  opacity: 0.95;
-  border: grey 1px solid;
-  border-radius: 6px;
-  padding: 6px 6px;
-  display:flex;
-  align-items:center
+	position: absolute;
+	top: 10px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 310px;
+	height: 35px;
+	background-color: $menuBackgroundColor;
+	opacity: 0.95;
+	border: grey 1px solid;
+	border-radius: 6px;
+	padding: 6px 6px;
+	display:flex;
+	align-items:center
 }
 
 .menuButton {
-  width: 30px;
-  height: 30px;
-  margin: 0 10px;
-  padding: 5px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
+	width: 35px;
+	height: 35px;
+	margin: 0 12px;
+	padding: 5px;
+	border: none;
+	background: transparent;
+	cursor: pointer;
 }
 
 .menuButton:hover {
-  background-color: #6E6E6E;
+	background-color: #6E6E6E;
 }
 
 .playButton {
-  position: relative;
-  display: inline-block;
+	position: relative;
+	display: inline-block;
 }
 
 .exampleList {
-  position: absolute;
-  display: none;
-  background-color: #6E6E6E;
-  list-style: none;
-  min-width: 100px;
-  margin: 0;
-  padding: 0;
-  left: 0;
-  top: 30px;
-  opacity: 0;
+	position: absolute;
+	display: none;
+	background-color: #6E6E6E;
+	list-style: none;
+	min-width: 100px;
+	margin: 0;
+	padding: 0;
+	left: 0;
+	top: 30px;
+	opacity: 0;
 }
 
 .exampleList > li {
-  color: white;
-  font-size: 13px;
-  padding: 9px 8px;
-  text-align: left;
-  text-decoration: none;
+	color: white;
+	font-size: 13px;
+	padding: 9px 8px;
+	text-align: left;
+	text-decoration: none;
+	user-select: none;
 }
 
 .exampleList > li:hover {
-  background-color: #555;
+	background-color: #555;
 }
 
 .playButton:hover > .exampleList,
 .exampleList:hover {
-  display: block;
-  opacity: 0.9;
+	display: block;
+	opacity: 0.9;
 }
 
 .menuButtonShape {
-  width: 80%;
-  height: 80%;
-  margin: 2px;
+	width: 80%;
+	height: 80%;
+	margin: 2px;
 }
 
 .stopButtonShape {
-  background-color: #FEFEFE;
+	background-color: $whiteColor;
 }
 
 .playButtonShape {
-  background-color: #FEFEFE;
-  clip-path: polygon(0% 0%, 80% 50%, 0% 100%);
-  margin-left: 5px;
+	background-color: $whiteColor;
+	clip-path: polygon(0% 0%, 80% 50%, 0% 100%);
+	margin-left: 5px;
+}
+
+.helpButtonShape {
+	position: relative;
+	background-color: $whiteColor;
+	border-radius: 50%;
+}
+
+.helpButtonInner {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 80%;
+	height: 80%;
+	border-radius: 50%;
+	background-color: $menuBackgroundColor;
+	color: white;
+	font-family: serif;
+	font-size: 11px;
+	font-weight: bold;
+	user-select: none;
 }
 
 .volumeButtonShape {
-  background-image: url('../img/volume-on.svg');
-  background-size: cover;
+	background-image: url('../img/volume-on.svg');
+	background-size: cover;
 }
 
 .volumeButtonOff {
-  background-image: url('../img/volume-off.svg');
+	background-image: url('../img/volume-off.svg');
 }
 
 .volumeSlider {
-  margin: 0 0 0 -10px;
-  width: 75px;
-  accent-color: #FEFEFE;
-  cursor: pointer;
+	margin: 0 0 0 -10px;
+	width: 75px;
+	accent-color: $whiteColor;
+	cursor: pointer;
 }
 
 .volumeSlider::-webkit-slider-runnable-track {
-  height: 4px;
+	height: 4px;
 }
 
 .volumeSlider::-webkit-slider-thumb {
-  margin-top: -6px; /* Centers thumb on the track */
+	margin-top: -6px; /* Centers thumb on the track */
 }
 
 
 .listener {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  text-align: left;
-  visibility: hidden;
-  animation: pulse 2s linear infinite;
+	position: absolute;
+	top: 20px;
+	left: 20px;
+	text-align: left;
+	visibility: hidden;
+	animation: pulse 2s linear infinite;
 }
 
 .listenerText {
-  color: #f3f3f3;
-  font-size: 18px;
-  margin: 0;
-  user-select: none
+	color: #f3f3f3;
+	font-size: 18px;
+	margin: 0;
+	user-select: none
 }
 
 .loaderContainer{
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  text-align: left;
+	position: absolute;
+	top: 20px;
+	left: 20px;
+	text-align: left;
 }
 
 .loaderText {
-  display: inline-block;
-  vertical-align: middle;
-  color: #f3f3f3;
+	display: inline-block;
+	vertical-align: middle;
+	color: #f3f3f3;
 	font-size: 18px;
-  margin: 0 10px;
+	margin: 0 10px;
 	white-space: nowrap;
 	overflow: hidden;
 	max-width: 100%;
-  user-select: none
+	user-select: none
 }
 
 .loaderText.complete {
@@ -235,77 +264,77 @@ canvas {
 }
 
 .loaderCircle {
-  display: inline-block;
-  border: 5px solid #f3f3f3; /* Light grey */
-  border-top: 5px solid darkgrey;
-  border-radius: 50%;
-  width: 25px;
-  height: 25px;
-  animation: spin 1500ms linear infinite;
-  vertical-align: middle;
+	display: inline-block;
+	border: 5px solid #f3f3f3; /* Light grey */
+	border-top: 5px solid darkgrey;
+	border-radius: 50%;
+	width: 25px;
+	height: 25px;
+	animation: spin 1500ms linear infinite;
+	vertical-align: middle;
 }
 
 .loaderCircle.complete {
 	border-color: green;
 	transition: border 500ms ease-out;
-  animation: spin 1200ms linear 1;
+	animation: spin 1200ms linear 1;
 }
 
 .loaderCheckmark {
 	width: 0;
 	height: 0;
-  left: 12px;
-  top: 17px;
+	left: 12px;
+	top: 17px;
 	opacity: 0;
-  content: "";
-  border-right: 2px solid green;
-  border-top: 2px solid green;
-  position: absolute;
+	content: "";
+	border-right: 2px solid green;
+	border-top: 2px solid green;
+	position: absolute;
 }
 
 .loaderCheckmark.draw {
 	animation-duration: 1300ms;
-  animation-timing-function: ease;
+	animation-timing-function: ease;
 	animation-fill-mode: forwards;
-  animation-name: drawCheckmark;
-  transform-origin: left top;
-  transform: scaleX(-1) rotate(135deg);
+	animation-name: drawCheckmark;
+	transform-origin: left top;
+	transform: scaleX(-1) rotate(135deg);
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
 }
 
 @keyframes pulse {
-  0% { opacity: 1; }
-  10% { opacity: 1; }
-  50% { opacity: 0.2; }
-  90% {opacity: 1; }
-  100% {opacity: 1; }
+	0% { opacity: 1; }
+	10% { opacity: 1; }
+	50% { opacity: 0.2; }
+	90% {opacity: 1; }
+	100% {opacity: 1; }
 }
 
 @keyframes drawCheckmark {
-  0% {
-    height: 0;
-    width: 0;
+	0% {
+		height: 0;
+		width: 0;
 		opacity: 0;
-  }
-  70% {
-    height: 0;
-    width: 0;
+	}
+	70% {
+		height: 0;
+		width: 0;
 		opacity: 0;
-  }
-  85% {
-    height: 0;
-    width: 4px;
+	}
+	85% {
+		height: 0;
+		width: 4px;
 		opacity: 1;
-  }
-  100% {
-    height: 9px;
-    width: 4px;
+	}
+	100% {
+		height: 9px;
+		width: 4px;
 		opacity: 1;
-  }
+	}
 }
 
 
@@ -316,31 +345,45 @@ canvas {
 	left: 0;
 	width: 100%;
 	height: 100%;
-	background: rgba(0, 0, 0, 0.8);
+	background: rgba(0, 0, 0, 0.5);
 	z-index: 1;
 }
 
 #introduction {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: white;
-    padding: 30px;
-    border-radius: 15px;
-    text-align: center;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	max-width: 500px;
+	transform: translate(-50%, -50%);
+	background: #333333;
+	color: white;
+	padding: 30px;
+	border: 1px solid;
+	border-color: $lightBlueColor;
+	border-radius: 10px;
+	text-align: center;
 }
 
-#introduction > h2 {
-	color: #5EBBBF;
+#definitionText {
+	color: #BEFCFF;
+}
+
+#definitionText > h1 {
+	color: $lightBlueColor;
+	font-size: xx-large;
+	margin: 0;
+}
+
+#definitionText > .pronunciation {
+	font-size: smaller;
 }
 
 #introGoButton {
 	border: none;
-	background: #5EBBBF;
+	background: $lightBlueColor;
 	color: white;
 	padding: 10px 30px;
-	border-radius: 10px;
+	border-radius: 5px;
 	cursor: pointer;
 	font-size: 16px;
 	font-weight: bold;
@@ -348,35 +391,35 @@ canvas {
 
 #closeIntroButton {
 	position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 30px;
-    height: 30px;
-    background: #bbb;
-    border: none;
-    cursor: pointer;
-    border-radius: 50%;
-    font-size: 0;
-    text-align: center;
+	top: 12px;
+	right: 12px;
+	width: 30px;
+	height: 30px;
+	background: none;
+	border: none;
+	cursor: pointer;
+	border-radius: 50%;
+	font-size: 0;
+	text-align: center;
 }
 
 #closeIntroButton::before,
 #closeIntroButton::after {
-    content: "";
-    position: absolute;
+	content: "";
+	position: absolute;
 	top: 7px;
 	left: 14px;
-    width: 2px;
-    height: 16px;
-    background: white;
+	width: 2px;
+	height: 16px;
+	background: white;
 }
 
 #closeIntroButton::before {
-    transform: rotate(45deg);
+	transform: rotate(45deg);
 }
 
 #closeIntroButton::after {
-    transform: rotate(-45deg);
+	transform: rotate(-45deg);
 }
 
 
