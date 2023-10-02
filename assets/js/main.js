@@ -118,6 +118,8 @@ function closeOverlay() {
 
 document.addEventListener("DOMContentLoaded", initialisePage);
 document.addEventListener("mouseup", () => globalMouseDown = false);
+document.addEventListener("keydown", (event) => piano.keyDown(event));
+document.addEventListener("keyup", (event) => piano.keyUp(event));
 
 var resizeTimeout = false;
 const resizeDelay = 40;

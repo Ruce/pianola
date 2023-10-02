@@ -5,6 +5,7 @@ class Piano {
 		}
 		this.octaves = octaves;
 		this.pianoKeys = Piano.createPianoKeys(this.octaves);
+		this.keyMap = PianoKeyMap.keyMap;
 		this.pianoCanvas = new PianoCanvas(this, canvasId);
 		this.sampler = this.initialiseSampler();
 		this.model = model;
@@ -19,7 +20,7 @@ class Piano {
 		this.bufferBeats = 4;
 		this.bufferTicks = Tone.Time(`0:${this.bufferBeats}`).toTicks();
 		this.historyWindowBeats = 36;
-		this.defaultBPM = 88;
+		this.defaultBPM = 80;
 		this.setBPM(this.defaultBPM);
 	}
 	
@@ -41,6 +42,21 @@ class Piano {
 			this.seedInputListener();
 		}
 		this.playNote(this.pianoKeys[keyNum], 0.8, -1, Actor.Player);
+	}
+	
+	keyDown(event) {
+		if (event.repeat) return;
+		const keyNum = this.keyMap[event.key];
+		if (keyNum !== undefined) {
+			this.keyPressed(keyNum);
+		}
+	}
+	
+	keyUp(event) {
+		const keyNum = this.keyMap[event.key];
+		if (keyNum !== undefined) {
+			this.releaseNote(this.pianoKeys[keyNum]);
+		}
 	}
 	
 	playNote(pianoKey, velocity, duration, actor, time, transportPosition=Tone.Transport.position) {
@@ -270,6 +286,8 @@ class PianoCanvas {
 		this.octaves = piano.octaves;
 		this.numWhiteKeys = 7 * this.octaves + 3; // 3 additional keys before and after main octaves
 		this.numBlackKeys = 5 * this.octaves + 1; // 1 additional key in the 0th octave
+		this.whiteHotkeyMap = this.getHotkeyMap(true);
+		this.blackHotkeyMap = this.getHotkeyMap(false);
 		
 		this.hoverKey = null;
 		this.prevHoverKey = null;
@@ -366,6 +384,20 @@ class PianoCanvas {
 		}
 	}
 	
+	getHotkeyMap(isWhite) {
+		// Calculate the hotkey for each colourKeyNum
+		const hotkeyMap = {};
+		const numKeys = isWhite ? this.numWhiteKeys : this.numBlackKeys;
+		for (let i = 0; i < numKeys; i++) {
+			const keyNum = PianoKey.calcKeyNumFromColourKeyNum(i, isWhite);
+			const hotkey = Object.keys(this.piano.keyMap).find(key => this.piano.keyMap[key] === keyNum);
+			if (hotkey !== undefined) {
+				hotkeyMap[i] = hotkey.toUpperCase();
+			}
+		}
+		return hotkeyMap;
+	}
+	
 	mouseDownKeyboard(event) {
 		globalMouseDown = true;
 		const clickedKeyNum = this.getKeyNumByCoord(event.clientX, event.clientY);
@@ -415,6 +447,10 @@ class PianoCanvas {
 		this.blackKeyHeight = this.whiteKeyHeight * PianoCanvas.blackKeyHeightRatio;
 		const [whiteKeyWidth, whiteKeyHeight, blackKeyWidth, blackKeyHeight] = [this.whiteKeyWidth, this.whiteKeyHeight, this.blackKeyWidth, this.blackKeyHeight];
 		
+		const keyFont = this.canvas.width > 800 ? "13px sans-serif" : "11px sans-serif";
+		const biggerKeyFont = "24px sans-serif"; // For comma (,) and period (.)
+		ctx.font = keyFont;
+		
 		// Remove expired keys and get the colourKeyNums for active keys
 		this.piano.activeKeys = this.piano.activeKeys.filter((k) => k.endTime >= new Date() || k.endTime === -1);
 		function getActiveKeyNums(activeKeys, actor, getWhiteKey) {
@@ -444,6 +480,17 @@ class PianoCanvas {
 			const x = this.getXCoordByKey(true, i);
 			ctx.fillRect(x, 0, whiteKeyWidth, whiteKeyHeight);
 			ctx.strokeRect(x, 0, whiteKeyWidth, whiteKeyHeight);
+			
+			const hotkey = this.whiteHotkeyMap[i];
+			if (hotkey !== undefined) {
+				ctx.fillStyle = '#D2D2D2';
+				if (hotkey === '.' || hotkey === ',') {
+					ctx.font = biggerKeyFont;
+				}
+				const textWidth = ctx.measureText(hotkey).width;
+				ctx.fillText(hotkey, x + (this.whiteKeyWidth / 2) - (textWidth / 2), this.whiteKeyHeight * 0.9);
+				ctx.font = keyFont;
+			}
 		}
 
 		for (let i = 0; i < this.numBlackKeys; i++) {
@@ -463,6 +510,13 @@ class PianoCanvas {
 			const x = this.getXCoordByKey(false, i);
 			ctx.fillRect(x, 0, blackKeyWidth, blackKeyHeight);
 			ctx.strokeRect(x, 0, blackKeyWidth, blackKeyHeight);
+			
+			const hotkey = this.blackHotkeyMap[i];
+			if (hotkey !== undefined) {
+				ctx.fillStyle = '#888888';
+				const textWidth = ctx.measureText(hotkey).width;
+				ctx.fillText(hotkey, x + (this.blackKeyWidth / 2) - (textWidth / 2), this.blackKeyHeight * 0.87);
+			}
 		}
 		
 		this.animationQueued = false;
@@ -532,6 +586,18 @@ class PianoKey {
 		}
 	}
 	
+	static calcKeyNumFromColourKeyNum(colourKeyNum, isWhiteKey) {
+		if (isWhiteKey) {
+			const octave = Math.floor((colourKeyNum + 5) / 7);
+			const octaveColourKeyNum = (colourKeyNum + 5) % 7;
+			return (octave * 12) - 10 + PianoKey.whiteKeyNumbers[octaveColourKeyNum];
+		} else {
+			const octave = Math.floor((colourKeyNum + 4) / 5);
+			const octaveColourKeyNum = (colourKeyNum + 4) % 5;
+			return (octave * 12) - 10 + PianoKey.blackKeyNumbers[octaveColourKeyNum];
+		}
+	}
+	
 	static get midiNoteNumMiddleC() {
 		return 60;
 	}
@@ -541,5 +607,11 @@ class PianoKey {
 		const pitchOctave = Math.floor(delta / 12) + 4;
 		const index = ((delta % 12) + 12) % 12; // Modulo operation to give non-negative result
 		return PianoKey.noteNames[index] + pitchOctave;
+	}
+}
+
+class PianoKeyMap {
+	static get keyMap() {
+		return {'q': 15, '2': 16, 'w': 17, '3': 18, 'e': 19, 'r': 20, '5': 21, 't': 22, '6': 23, 'y': 24, '7': 25, 'u': 26, 'i': 27, '9': 28, 'o': 29, '0': 30, 'p': 31, '[': 32, '=': 33, ']': 34, 'a': 35, 'z': 36, 's': 37, 'x': 38, 'c': 39, 'f': 40, 'v': 41, 'g': 42, 'b': 43, 'n': 44, 'j': 45, 'm': 46, 'k': 47, ',': 48, 'l': 49, '.': 50, '/': 51};
 	}
 }
