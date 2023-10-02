@@ -65,8 +65,10 @@ function initialiseVolumeSlider() {
 		const volumeButtonImage = document.getElementById('volumeButtonImage');
 		if (newVolume === 0 && !volumeButtonImage.classList.contains('volumeButtonOff')) {
 			volumeButtonImage.classList.add('volumeButtonOff');
+			document.getElementById('menuMuteTooltip').textContent = 'Unmute';
 		} else if (newVolume > 0 && volumeButtonImage.classList.contains('volumeButtonOff')) {
 			volumeButtonImage.classList.remove('volumeButtonOff');
+			document.getElementById('menuMuteTooltip').textContent = 'Mute';
 		}
 	});
 }
@@ -90,10 +92,12 @@ function toggleMute() {
 		previousVolume = newVolume;
 		volumeSlider.value = newVolume;
 		piano.changeVolume(newVolume);
+		document.getElementById('menuMuteTooltip').textContent = 'Mute';
 	} else {
 		volumeButtonImage.classList.add('volumeButtonOff');
 		volumeSlider.value = 0;
 		piano.changeVolume(0);
+		document.getElementById('menuMuteTooltip').textContent = 'Unmute';
 	}
 }
 

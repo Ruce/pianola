@@ -3,6 +3,7 @@ $bodyColor: #000000;
 $lightBlueColor: #5EBBBF;
 $whiteColor: #FEFEFE;
 $menuBackgroundColor: #595959;
+$menuLightColor: #6E6E6E;
 $bodyFont: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
 
 body {
@@ -116,7 +117,23 @@ canvas {
 }
 
 .menuButton:hover {
-	background-color: #6E6E6E;
+	background-color: $menuLightColor;
+}
+
+.menuButtonTooltip {
+	display: none;
+	position: absolute;
+	top: 110%;
+	padding: 5px;
+	border-radius: 5px;
+	background-color: $menuLightColor;
+	font-size: 11px;
+	color: white;
+	pointer-events: none;
+}
+
+.menuButton:hover > .menuButtonTooltip {
+	display: block;
 }
 
 .playButton {
@@ -127,7 +144,7 @@ canvas {
 .exampleList {
 	position: absolute;
 	display: none;
-	background-color: #6E6E6E;
+	background-color: $menuLightColor;
 	list-style: none;
 	min-width: 100px;
 	margin: 0;

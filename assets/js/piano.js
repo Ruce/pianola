@@ -46,6 +46,10 @@ class Piano {
 	
 	keyDown(event) {
 		if (event.repeat) return;
+		if (event.key === ' ') {
+			this.stopCallModel();
+		}
+		
 		const keyNum = this.keyMap[event.key];
 		if (keyNum !== undefined) {
 			this.keyPressed(keyNum);
@@ -95,6 +99,8 @@ class Piano {
 	}
 	
 	releaseNote(pianoKey) {
+		this.lastActivity = new Date();
+		
 		// Check if `pianoKey` is in the `activeKeys` array, and if so release the note
 		const activeKey = this.activeKeys.find(obj => obj.key === pianoKey);
 		const keyIndex = this.activeKeys.indexOf(activeKey);
@@ -196,7 +202,7 @@ class Piano {
 	}
 	
 	seedInputAwaiter() {
-		if (new Date() - this.lastActivity > 2000 && !globalMouseDown) {
+		if (new Date() - this.lastActivity > 2500 && this.activeKeys.length === 0) {
 			clearInterval(this.listenerIntervalId);
 			
 			// Rewind the transport schedule to the last of the seed input so that the history fed to the model is seamless
