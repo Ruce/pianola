@@ -301,6 +301,7 @@ class PianoCanvas {
 		this.animationQueued = false;
 		
 		this.canvas = document.getElementById(canvasId);
+		this.canvas.style.touchAction = 'none';
 		this.canvas.addEventListener('mousedown', this.mouseDownKeyboard.bind(this));
 		this.canvas.addEventListener('mousemove', this.mouseMoveKeyboard.bind(this));
 		this.canvas.addEventListener('mouseup', this.mouseOutKeyboard.bind(this));
