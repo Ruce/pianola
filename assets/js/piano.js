@@ -305,7 +305,7 @@ class PianoCanvas {
 		this.canvas.addEventListener('mousemove', this.mouseMoveKeyboard.bind(this));
 		this.canvas.addEventListener('mouseup', this.mouseOutKeyboard.bind(this));
 		this.canvas.addEventListener('mouseout', this.mouseOutKeyboard.bind(this));
-		this.canvas.addEventListener('touchstart', this.touchStartKeyboard.bind(this));
+		this.canvas.addEventListener('touchstart', this.touchChangeKeyboard.bind(this));
 		this.canvas.addEventListener('touchmove', this.touchChangeKeyboard.bind(this));
 		this.canvas.addEventListener('touchend', this.touchChangeKeyboard.bind(this));
 		this.canvas.addEventListener('touchcancel', this.touchChangeKeyboard.bind(this));
@@ -437,16 +437,8 @@ class PianoCanvas {
 		this.piano.lastActivity = new Date();
 	}
 	
-	touchStartKeyboard(event) {
-		event.preventDefault();
-		for (const t of event.targetTouches) {
-			const clickedKeyNum = this.getKeyNumByCoord(t.clientX, t.clientY);
-			this.piano.keyPressed(clickedKeyNum);
-			this.touchedKeys.push(this.piano.pianoKeys[clickedKeyNum]);
-		}
-	}
-	
 	touchChangeKeyboard(event) {
+		event.preventDefault();
 		const currTouchedKeys = [];
 		for (const t of event.targetTouches) {
 			const touchedElement = document.elementFromPoint(t.clientX, t.clientY); // Touch could have moved outside of origin element

@@ -60,6 +60,7 @@ class NotesCanvas {
 		this.lastAnimationCheck = null;
 		this.frameCount = 0;
 		this.enableShadows = true;
+		this.enableRoundRect = true;
 		
 		this.glowStart = null;
 		this.glowEnd = null;
@@ -140,6 +141,7 @@ class NotesCanvas {
 			this.lastAnimationCheck = null;
 			this.frameCount = 0;
 			this.enableShadows = true;
+			this.enableRoundRect = true;
 			return;
 		}
 		
@@ -147,7 +149,7 @@ class NotesCanvas {
 		//ctx.fillStyle = 'red';
 		//ctx.fillRect(0, new Date().getMilliseconds() / 10, 10, 10);
 		
-		// Check the current fps and disable shadows if slow
+		// Check the current fps and disable effects if slow
 		this.frameCount++;
 		if (this.lastAnimationCheck === null) {
 			this.lastAnimationCheck = timestamp;
@@ -155,7 +157,13 @@ class NotesCanvas {
 			const elapsed = timestamp - this.lastAnimationCheck;
 			if (elapsed > 1000) {
 				const fps = this.frameCount / (elapsed / 1000);
-				if (fps < 50) this.enableShadows = false;
+				if (fps < 50) {
+					if (this.enableShadows) {
+						this.enableShadows = false;
+					} else {
+						this.enableRoundRect = false;
+					}
+				}
 				this.frameCount = 0;
 				this.lastAnimationCheck = timestamp;
 			}
@@ -200,9 +208,13 @@ class NotesCanvas {
 				ctx.fillStyle = n.isWhiteKey ? NoteBar.fill.model.white : NoteBar.fill.model.black;
 				ctx.shadowColor = NoteBar.fill.model.shadow;
 			}
-			ctx.beginPath();
-			ctx.roundRect(rectX, rectY, noteWidth, noteHeight, 6);
-			ctx.fill();
+			if (enableRoundRect) {
+				ctx.beginPath();
+				ctx.roundRect(rectX, rectY, noteWidth, noteHeight, 6);
+				ctx.fill();
+			} else {
+				ctx.fillRect(rectX, rectY, noteWidth, noteHeight);
+			}
 			
 			if (n.relativeBot > -NoteBar.minRelHeight*2) {
 				n.lastUpdateTime = currTime;
