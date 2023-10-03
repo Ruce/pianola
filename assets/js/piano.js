@@ -297,6 +297,7 @@ class PianoCanvas {
 		
 		this.hoverKey = null;
 		this.prevHoverKey = null;
+		this.touchedKeys = [];
 		this.animationQueued = false;
 		
 		this.canvas = document.getElementById(canvasId);
@@ -304,6 +305,10 @@ class PianoCanvas {
 		this.canvas.addEventListener('mousemove', this.mouseMoveKeyboard.bind(this));
 		this.canvas.addEventListener('mouseup', this.mouseOutKeyboard.bind(this));
 		this.canvas.addEventListener('mouseout', this.mouseOutKeyboard.bind(this));
+		this.canvas.addEventListener('touchstart', this.touchStartKeyboard.bind(this));
+		this.canvas.addEventListener('touchmove', this.touchChangeKeyboard.bind(this));
+		this.canvas.addEventListener('touchend', this.touchChangeKeyboard.bind(this));
+		this.canvas.addEventListener('touchcancel', this.touchChangeKeyboard.bind(this));
 		this.triggerDraw();
 	}
 	
@@ -432,6 +437,41 @@ class PianoCanvas {
 		this.piano.lastActivity = new Date();
 	}
 	
+	touchStartKeyboard(event) {
+		event.preventDefault();
+		for (const t of event.targetTouches) {
+			const clickedKeyNum = this.getKeyNumByCoord(t.clientX, t.clientY);
+			this.piano.keyPressed(clickedKeyNum);
+			this.touchedKeys.push(this.piano.pianoKeys[clickedKeyNum]);
+		}
+	}
+	
+	touchChangeKeyboard(event) {
+		const currTouchedKeys = [];
+		for (const t of event.targetTouches) {
+			const touchedElement = document.elementFromPoint(t.clientX, t.clientY); // Touch could have moved outside of origin element
+			if (touchedElement && touchedElement.id === 'pianoCanvas') {
+				const keyNum = this.getKeyNumByCoord(t.clientX, t.clientY);
+				currTouchedKeys.push(this.piano.pianoKeys[keyNum]);
+			}
+		}
+		
+		const newKeys = currTouchedKeys.filter(x => !this.touchedKeys.includes(x));
+		const releasedKeys = this.touchedKeys.filter(x => !currTouchedKeys.includes(x));
+		
+		for (const k of newKeys) {
+			this.piano.keyPressed(k.keyNum);
+			this.touchedKeys.push(k);
+		}
+		
+		for (const k of releasedKeys) {
+			this.piano.releaseNote(k);
+			this.touchedKeys.splice(this.touchedKeys.indexOf(k), 1); // Remove key
+		}
+		
+		if (newKeys.length + releasedKeys.length > 0) this.triggerDraw();
+	}
+	
 	triggerDraw() {
 		if (!this.animationQueued) {
 			this.animationQueued = true;
@@ -453,7 +493,7 @@ class PianoCanvas {
 		this.blackKeyHeight = this.whiteKeyHeight * PianoCanvas.blackKeyHeightRatio;
 		const [whiteKeyWidth, whiteKeyHeight, blackKeyWidth, blackKeyHeight] = [this.whiteKeyWidth, this.whiteKeyHeight, this.blackKeyWidth, this.blackKeyHeight];
 		
-		const keyFont = this.canvas.width > 800 ? "13px sans-serif" : "11px sans-serif";
+		const keyFont = this.canvas.width > 800 ? "13px sans-serif" : "8px sans-serif";
 		const biggerKeyFont = "24px sans-serif"; // For comma (,) and period (.)
 		ctx.font = keyFont;
 		
