@@ -208,7 +208,7 @@ class NotesCanvas {
 				ctx.fillStyle = n.isWhiteKey ? NoteBar.fill.model.white : NoteBar.fill.model.black;
 				ctx.shadowColor = NoteBar.fill.model.shadow;
 			}
-			if (enableRoundRect) {
+			if (this.enableRoundRect) {
 				ctx.beginPath();
 				ctx.roundRect(rectX, rectY, noteWidth, noteHeight, 6);
 				ctx.fill();
