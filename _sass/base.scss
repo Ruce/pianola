@@ -23,6 +23,22 @@ canvas {
 	vertical-align: top;
 }
 
+::-webkit-scrollbar {
+	width: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+	background: #999;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: #555;
+}
+
 #content {
 	display: none;
 }
@@ -146,18 +162,21 @@ canvas {
 	display: none;
 	background-color: $menuLightColor;
 	list-style: none;
-	min-width: 100px;
+	min-width: 90px;
+	max-height: 135px;
 	margin: 0;
 	padding: 0;
 	left: 0;
 	top: 35px;
 	opacity: 0;
+	overflow: hidden;
+	overflow-y: scroll;
 }
 
 .exampleList > li {
 	color: white;
-	font-size: 13px;
-	padding: 9px 8px;
+	font-size: 12px;
+	padding: 8px;
 	text-align: left;
 	text-decoration: none;
 	user-select: none;
