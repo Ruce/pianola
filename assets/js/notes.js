@@ -57,6 +57,10 @@ class NotesCanvas {
 		this.activeBars = [];
 		
 		this.animationActive = false;
+		this.lastAnimationCheck = null;
+		this.frameCount = 0;
+		this.enableShadows = true;
+		
 		this.glowStart = null;
 		this.glowEnd = null;
 		this.glowOpacity = 0;
@@ -90,7 +94,7 @@ class NotesCanvas {
 	}
 	
 	triggerAnimation() {
-		window.requestAnimationFrame(() => this.draw());
+		window.requestAnimationFrame(timestamp => this.draw(timestamp));
 	}
 	
 	startGlow(delayMilliseconds) {
@@ -109,9 +113,11 @@ class NotesCanvas {
 	updateGlowOpacity() {
 		const maxOpacity = 0.4;
 		if (this.glowEnd !== null) {
+			// Fade out glow
 			const delta = new Date() - this.glowEnd;
 			this.glowOpacity = Math.min(maxOpacity - (delta / 2000), this.glowOpacity);
 		} else if (this.glowStart !== null) {
+			// Fade in glow
 			const delta = new Date() - this.glowStart;
 			this.glowOpacity = Math.max(delta / 3000, this.glowOpacity);
 		} else {
@@ -121,28 +127,42 @@ class NotesCanvas {
 		return this.glowOpacity;
 	}
 	
-	draw() {
+	draw(timestamp) {
 		const ctx = this.canvas.getContext('2d');
 		this.canvas.width = window.innerWidth;
 		this.canvas.height = window.innerHeight - this.piano.pianoCanvas.canvas.height;
 		ctx.fillStyle = '#333333';
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		
+		// Check if there is anything to animate
+		if (this.updateGlowOpacity() === 0 && this.activeBars.length === 0) {
+			this.animationActive = false;
+			this.lastAnimationCheck = null;
+			this.frameCount = 0;
+			this.enableShadows = true;
+			return;
+		}
+		
 		// Debug placeholder square to see if animations are fired
 		//ctx.fillStyle = 'red';
 		//ctx.fillRect(0, new Date().getMilliseconds() / 10, 10, 10);
 		
-		if (this.updateGlowOpacity() === 0 && this.activeBars.length === 0) {
-			this.animationActive = false;
-			return;
+		// Check the current fps and disable shadows if slow
+		this.frameCount++;
+		if (this.lastAnimationCheck === null) {
+			this.lastAnimationCheck = timestamp;
+		} else {
+			const elapsed = timestamp - this.lastAnimationCheck;
+			if (elapsed > 1000) {
+				const fps = this.frameCount / (elapsed / 1000);
+				if (fps < 50) this.enableShadows = false;
+				this.frameCount = 0;
+				this.lastAnimationCheck = timestamp;
+			}
 		}
 		
-		const newActiveBars = [];
-		const currTime = new Date();
-		const noteLongevity = (6 / (this.bpm / 60)) * 1000; // Number of milliseconds that a note lives on screen (i.e. scrolls from bottom to top)
-		
+		// Glow effect at the bottom of the canvas
 		if (this.glowOpacity > 0) {
-			// Glow effect at the bottom of the canvas
 			const glowColor = `rgba(190, 252, 255, ${this.glowOpacity})`;
 			const gradient = ctx.createLinearGradient(0, this.canvas.height - 50, 0, this.canvas.height);
 			gradient.addColorStop(0, 'transparent');
@@ -151,8 +171,14 @@ class NotesCanvas {
 			ctx.fillRect(0, this.canvas.height - 50, this.canvas.width, 50);
 		}
 		
-		const shadowBlur = 7;
-		ctx.shadowBlur = shadowBlur;
+		// Draw note bars
+		const newActiveBars = [];
+		const currTime = new Date();
+		const noteLongevity = (6 / (this.bpm / 60)) * 1000; // Number of milliseconds that a note lives on screen (i.e. scrolls from bottom to top)
+		if (this.enableShadows) {
+			const shadowBlur = 7;
+			ctx.shadowBlur = shadowBlur;
+		}
 		for (const n of this.activeBars) {
 			const yDelta = (currTime - n.lastUpdateTime) / noteLongevity;
 			n.relativeTop = Math.max(n.relativeTop - yDelta, -NoteBar.minRelHeight*2);

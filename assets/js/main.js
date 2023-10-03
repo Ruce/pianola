@@ -35,7 +35,7 @@ function initialisePage() {
 	
 	Tone.ToneAudioBuffer.loaded().then(() => {
 		NProgress.set(0.8);
-		setTimeout(() => loadingComplete(), 100);
+		setTimeout(() => loadingComplete(), 300);
 	});
 }
 
