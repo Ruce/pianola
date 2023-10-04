@@ -66,7 +66,7 @@ class MidiUtil():
     assert midi.type == 0 or midi.type == 1, "Type 2 MIDI files are not supported"
     timesteps = 0
     for track in midi.tracks:
-      track_timesteps = 0
+      track_timesteps = 1 # Start at 1 because 0th timestep is a timestep
       for msg in track:
         track_timesteps += msg.time
       timesteps = max(timesteps, track_timesteps)
