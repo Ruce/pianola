@@ -242,16 +242,16 @@ class MidiUtil():
       start_w = end
       prev_best_int = best_int
     return torch.stack(compressed_vectors)
-
-  def dynamic_compress_timed_tensor(tensor, desired_tpb):
+    
+def dynamic_compress_timed_tensor(tensor, desired_tpb, window=5760, max_dispersion_diff=0.05):
     '''
       `tensor`: shape (num_timesteps, num_notes, 2), where last dimension are features (velocity, duration)
+       `max_dispersion_diff`: Threshold between best tpb and previous window's tpb dispersions to change tpb
     '''
     start_interval = 40       # Minimum ticks per 1/8th beat to analyse
     end_interval = 64         # Maximum ticks per 1/8th beat to analyse
-    w = 3840                  # Window range for each slice to be processed
+    w = window                  # Window range for each slice to be processed
     min_notes_in_window = 12  # Minimum number of notes within a window `w` to calculate new tpb
-    max_dispersion_diff = 0.1 # Threshold between best tpb and previous window's tpb dispersions to change tpb
 
     # Get the timings where notes are played; multiple notes at the same timestep are only counted once
     note_timings = torch.nonzero(torch.sum(tensor[:, :, 0], dim=1) != 0, as_tuple=True)[0].tolist()
@@ -276,19 +276,37 @@ class MidiUtil():
 
       tpb = best_int * 8
       compress_factor = MidiUtil.calculate_compress_factor(tpb, desired_tpb)
-      for start in range(start_w, min(end_w, len(tensor)), compress_factor):
-        end = start + compress_factor
-        tensor_slice = tensor[start:end]
+
+      # Shift notes within an interval to maximise distances between notes and interval boundaries
+      deviations = []
+      for i in range(compress_factor):
+        total_deviation = 0
+        for t in timings:
+          # For timing `t`, align it to start of the window `start_w` then shift it by `i` to check its deviation from midpoint
+          deviation_from_mid = abs(((t - start_w + i) % compress_factor) - (compress_factor/2))
+          total_deviation += deviation_from_mid
+        deviations.append(total_deviation)
+      best_adjustment = np.array(deviations).argmin()
+
+      window_tensor = tensor[start_w:end_w]
+      intervals = math.floor((len(window_tensor) + best_adjustment) / compress_factor) # + 1 # Add 1 because of possible additional interval when notes are shifted
+      for i in range(intervals):
+        start = max((i * compress_factor) - best_adjustment, 0)
+        end = max(((i+1) * compress_factor) - best_adjustment, 0)
+        tensor_slice = window_tensor[start:end]
+        if len(tensor_slice) == 0:
+          continue
+
         slice_velocities = tensor_slice[:, :, 0]
         slice_durations = tensor_slice[:, :, 1]
-
         # Get the highest duration per note and its corresponding velocity, in case the same note is played more than once in this window
         values, indices = slice_durations.max(dim=0)
         max_velocities = slice_velocities[indices, torch.arange(slice_velocities.shape[1])]
+
         max_durations = values / compress_factor
         compressed = torch.stack([max_velocities, max_durations], dim=1).float()
         compressed_vectors.append(compressed)
-      start_w = end
+      start_w += end
       prev_best_int = best_int
     return torch.stack(compressed_vectors)
   
