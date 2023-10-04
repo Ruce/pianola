@@ -243,7 +243,7 @@ class MidiUtil():
       prev_best_int = best_int
     return torch.stack(compressed_vectors)
     
-def dynamic_compress_timed_tensor(tensor, desired_tpb, window=5760, max_dispersion_diff=0.05):
+  def dynamic_compress_timed_tensor(tensor, desired_tpb, window=5760, max_dispersion_diff=0.05):
     '''
       `tensor`: shape (num_timesteps, num_notes, 2), where last dimension are features (velocity, duration)
        `max_dispersion_diff`: Threshold between best tpb and previous window's tpb dispersions to change tpb
