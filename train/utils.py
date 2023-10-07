@@ -193,10 +193,11 @@ class MidiUtil():
     deltas = [(t % interval) / interval for t in window] # Normalised distance between on-beats and note
     return circvar(deltas, high=1)
 
-  def calc_best_interval(window, low, high):
-    # Interval ticks between 32nd notes
-    dispersions = np.array([MidiUtil.calc_dispersion(window, i) for i in range(low, high)])
-    best = dispersions.argmin() + low
+  def calc_best_interval(window, low, high, base):
+    ## Interval ticks between 32nd notes
+    # Slight bias towards intervals close to the base (i.e. based on original ticks per beat)
+    dispersions = [MidiUtil.calc_dispersion(window, i) + (abs(i-base)*0.001) for i in range(low, high)]
+    best = np.array(dispersions).argmin() + low
     return best
 
   def get_timings_in_range(note_timings, start, end):
@@ -243,15 +244,16 @@ class MidiUtil():
       prev_best_int = best_int
     return torch.stack(compressed_vectors)
     
-  def dynamic_compress_timed_tensor(tensor, desired_tpb, window=5760, max_dispersion_diff=0.05):
+  def dynamic_compress_timed_tensor(tensor, orig_tpb, desired_tpb, window_beats=12, max_dispersion_diff=0.05):
     '''
       `tensor`: shape (num_timesteps, num_notes, 2), where last dimension are features (velocity, duration)
        `max_dispersion_diff`: Threshold between best tpb and previous window's tpb dispersions to change tpb
     '''
-    start_interval = 40       # Minimum ticks per 1/8th beat to analyse
-    end_interval = 64         # Maximum ticks per 1/8th beat to analyse
-    w = window                  # Window range for each slice to be processed
-    min_notes_in_window = 12  # Minimum number of notes within a window `w` to calculate new tpb
+    start_interval = math.floor(orig_tpb / 12)      # Minimum ticks per 1/8th beat to analyse
+    end_interval = math.ceil(start_interval * 1.6)  # Maximum ticks per 1/8th beat to analyse
+    base_interval = round(orig_tpb / 8)             # Ticks per 1/8th beat with original tpb
+    w = window_beats * orig_tpb                     # Window range for each slice to be processed
+    min_notes_in_window = 12                        # Minimum number of notes within a window `w` to calculate new tpb
 
     # Get the timings where notes are played; multiple notes at the same timestep are only counted once
     note_timings = torch.nonzero(torch.sum(tensor[:, :, 0], dim=1) != 0, as_tuple=True)[0].tolist()
