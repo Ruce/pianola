@@ -266,7 +266,7 @@ class MidiUtil():
       while len(timings) < min_notes_in_window and end_w < len(tensor):
         end_w += w
         timings = MidiUtil.get_timings_in_range(note_timings, start_w, end_w)
-      best_int = MidiUtil.calc_best_interval(timings, start_interval, end_interval)
+      best_int = MidiUtil.calc_best_interval(timings, start_interval, end_interval, base_interval)
 
       if best_int != prev_best_int and prev_best_int is not None:
         best_dispersion = MidiUtil.calc_dispersion(timings, best_int)
