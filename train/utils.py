@@ -192,11 +192,18 @@ class MidiUtil():
   def calc_dispersion(window, interval):
     deltas = [(t % interval) / interval for t in window] # Normalised distance between on-beats and note
     return circvar(deltas, high=1)
+    
+  def calc_interval_score(window, interval, base_interval=None):
+    dispersion = MidiUtil.calc_dispersion(window, interval)
+    # Penalise deviation from `base_interval`
+    penalty_factor = 1 / (base_interval * 5)
+    penalty = abs(interval - base_interval) * penalty_factor if base_interval != None else 0
+    return dispersion + penalty
 
   def calc_best_interval(window, low, high, base):
     ## Interval ticks between 32nd notes
     # Slight bias towards intervals close to the base (i.e. based on original ticks per beat)
-    dispersions = [MidiUtil.calc_dispersion(window, i) + (abs(i-base)*0.001) for i in range(low, high)]
+    dispersions = [MidiUtil.calc_interval_score(window, i, base) for i in range(low, high)]
     best = np.array(dispersions).argmin() + low
     return best
 
@@ -206,43 +213,6 @@ class MidiUtil():
       if t >= start and t < end:
         output.append(t)
     return output
-  
-  def dynamic_compress_tensor(tensor, desired_tpb):
-    start_interval = 40
-    end_interval = 64
-    w = 1920 # Window range for each slice to be processed
-    min_notes_in_window = 12
-    max_dispersion_diff = 0.1
-    
-    note_timings = torch.nonzero(torch.sum(tensor, dim=1) != 0, as_tuple=True)[0].tolist()
-    start_w = 0
-    prev_best_int = None
-    compressed_vectors = []
-    while start_w < len(tensor):
-      end_w = start_w + w
-      timings = MidiUtil.get_timings_in_range(note_timings, start_w, end_w)
-      while len(timings) < min_notes_in_window and end_w < len(tensor):
-        end_w += w
-        timings = MidiUtil.get_timings_in_range(note_timings, start_w, end_w)
-      best_int = MidiUtil.calc_best_interval(timings, start_interval, end_interval)
-      
-      if best_int != prev_best_int and prev_best_int is not None:
-        best_dispersion = MidiUtil.calc_dispersion(timings, best_int)
-        for i in [0, -1, 1, -2, 2]:
-          alt_dispersion = MidiUtil.calc_dispersion(timings, prev_best_int + i)
-          if alt_dispersion - best_dispersion < max_dispersion_diff:
-            best_int = prev_best_int + i
-            break
-      
-      tpb = best_int * 8
-      compress_factor = MidiUtil.calculate_compress_factor(tpb, desired_tpb)
-      for start in range(start_w, min(end_w, len(tensor)), compress_factor):
-        end = start + compress_factor
-        tensor_slice = tensor[start:end, :]
-        compressed_vectors.append(tensor_slice.max(dim=0).values)
-      start_w = end
-      prev_best_int = best_int
-    return torch.stack(compressed_vectors)
     
   def dynamic_compress_timed_tensor(tensor, orig_tpb, desired_tpb, window_beats=12, max_dispersion_diff=0.05):
     '''
@@ -269,11 +239,14 @@ class MidiUtil():
       best_int = MidiUtil.calc_best_interval(timings, start_interval, end_interval, base_interval)
 
       if best_int != prev_best_int and prev_best_int is not None:
-        best_dispersion = MidiUtil.calc_dispersion(timings, best_int)
+        best_dispersion = MidiUtil.calc_interval_score(timings, best_int, base_interval)
         for i in [0, -1, 1, -2, 2]:
-          alt_dispersion = MidiUtil.calc_dispersion(timings, prev_best_int + i)
+          alt_int = prev_best_int + i
+          if alt_int < start_interval or alt_int > end_interval:
+            continue
+          alt_dispersion = MidiUtil.calc_interval_score(timings, alt_int, base_interval)
           if alt_dispersion - best_dispersion < max_dispersion_diff:
-            best_int = prev_best_int + i
+            best_int = alt_int
             break
 
       tpb = best_int * 8
