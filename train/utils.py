@@ -12,19 +12,32 @@ from scipy.stats import circmean, circvar
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class MidiDataset(Dataset):
-  def __init__(self, tensors, source_size, sample_delta=1, note_shift=0):
+  def __init__(self, tensors, transpositions, low_note, num_notes, source_size, sample_delta=1, note_shift=0):
     '''
-    `tensors`: list of tensors where each tensor is a song of shape (timesteps, notes)
+    `tensors`: list of tensors where each tensor is a song of shape (timesteps, notes, features)
+    `transpositions`: list of integers for the number of notes to transpose the corresponding tensor in `tensors`
+    `low_note`: the index of the base lowest note (i.e. before tranposing), relative to the notes dimension in `tensors`
+    `num_notes`: the number of notes to include in the data, starting at `low_note`
     `source_size`: number of timesteps for the source sequence
     `sample_delta`: number of timesteps between each sample, i.e. overlapping samples if < source_size, gaps between samples if > source_size
     `note_shift`: randomly shift the notes up or down by this amount in order to augment data. Results in some data loss as tensors will padded and trimmed
     '''
-    self.tensors = tensors
-    self.tensor_lengths = [len(t) for t in tensors]
+    assert len(tensors) == len(transpositions), "Arguments `tensors` and `transpositions` must have the same length"
+
+    self.transpositions = transpositions
+    self.low_note = low_note
+    self.num_notes = num_notes
     self.source_size = source_size
     self.sample_delta = sample_delta
     self.note_shifts = list(range(-note_shift, note_shift+1))
+
+    # Calculate maximum amount that a tensor could be transposed, and pad tensors in advance by that amount
+    self.max_shift = max([abs(i) for i in transpositions]) + note_shift
+    padding = (self.max_shift, self.max_shift) if len(tensors[0].shape) == 2 else (0, 0, self.max_shift, self.max_shift)
+    self.padded_tensors = [F.pad(tensor, padding) for tensor in tensors]
+
     # Calculate number of samples per tensor
+    self.tensor_lengths = [len(t) for t in tensors]
     self.tensor_samples = [max(0, ((n - self.source_size - 1) // self.sample_delta) + 1) for n in self.tensor_lengths]
 
   def __len__(self):
@@ -39,25 +52,22 @@ class MidiDataset(Dataset):
       curr_sample_id += n
       if curr_sample_id > idx:
         # This tensor contains the item we want
-        tensor = self.tensors[i]
+        tensor = self.padded_tensors[i]
+
+        # Transpose and shift notes
+        transpose = self.transpositions[i]
+        low = self.low_note + transpose + note_shift + self.max_shift
+        high = low + self.num_notes
 
         # Which window in this sample contains the item we want?
         window_idx = idx - (curr_sample_id - n)
         start = window_idx * self.sample_delta
         end = start + self.source_size
 
-        if note_shift > 0:
-          padding = (note_shift, 0) if len(tensor.shape) == 2 else (0, 0, note_shift, 0)
-          tensor = F.pad(tensor, padding)
-          tensor = tensor[:, :-note_shift]
-        elif note_shift < 0:
-          padding = (0, abs(note_shift)) if len(tensor.shape) == 2 else (0, 0, 0, abs(note_shift))
-          tensor = F.pad(tensor, padding)
-          tensor = tensor[:, abs(note_shift):]
-        x = tensor[start:end]
+        x = tensor[start:end, low:high]
         if len(x.shape) == 2:
           x = x.unsqueeze(dim=-1) # Add a channel dimension
-        y = tensor[start+1:end+1]
+        y = tensor[start+1:end+1, low:high]
         return x, y
 
 class MidiUtil():
