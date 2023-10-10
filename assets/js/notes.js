@@ -1,12 +1,29 @@
 class Note {
-	constructor(keyNum, velocity, duration, position) {
-		this.keyNum = keyNum;
+	constructor(pianoKey, velocity, duration, time, actor, scheduleId) {
+		this.key = pianoKey;
 		this.velocity = velocity;
 		this.duration = duration;
-		this.position = position;
+		this.time = time;
+		this.actor = actor;
+		this.scheduleId = scheduleId;
 	}
 	
-	static getRecentHistory(history, startTick) {
+	static getRecentHistory(history, startTime) {
+		// Returns events in history that happened on or after `startTime`
+		// `history` must be an ordered list of events from first to most recent
+		const recentHistory = [];
+		for (let i = history.length - 1; i >= 0; i--) {
+			const h = history[i];
+			if (h.time >= startTime) {
+				recentHistory.unshift(h);
+			} else {
+				break;
+			}
+		}
+		return recentHistory;
+	}
+	
+	static getRecentHistoryDeprecated(history, startTick) {
 		// Returns events in history that happened on or after `startTick`
 		// `history` must be an ordered list of events from first to most recent
 		const recentHistory = [];
@@ -19,6 +36,11 @@ class Note {
 			}
 		}
 		return recentHistory;
+	}
+	
+	getPosition(bpm) {
+		const beats = this.time * bpm / 60000;
+		return `0:${beats}`
 	}
 }
 

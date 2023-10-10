@@ -146,6 +146,7 @@ canvas {
 	font-size: 11px;
 	color: white;
 	pointer-events: none;
+	user-select: none;
 }
 
 .menuButton:hover > .menuButtonTooltip {

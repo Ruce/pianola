@@ -1,41 +1,42 @@
 class PianolaModel {
 	constructor(endpoint) {
 		this.endpoint = endpoint;
-		this.noteHistory = []; // Array tracking the history of generated notes (ordered from earliest to most recent)
 	}
-	
-	static queryStringToNotes(data, basePositionTick) {
+		
+	static queryStringToNotes(data, start, bpm) {
+		const s = 60 / (bpm * 4); // Length of a sixteenth note in seconds
+		
 		const generated = [];
 		const timesteps = data.split(';');
 		for (let i=0; i < timesteps.length; i++) {
 			const step = timesteps[i];
-			const genPosition = (basePositionTick + i*48) + "i";
+			const time = start + i*s;
 			for (let i = 0; i < step.length; i += 6) {
 				const note = step.slice(i, i + 6);
 				const noteNum = parseInt(note.slice(0, 2));
 				const velocity = (parseInt(note.slice(2, 4)) + 1) / 100;
-				const duration = parseInt(note.slice(4, 6));
-				generated.push(new Note(noteNum, velocity, duration, genPosition));
+				const duration = parseInt(note.slice(4, 6)) * s;
+				generated.push({keyNum: noteNum, velocity: velocity, duration: duration, time: time});
 			}
 		}
 		return generated;
 	}
 	
-	static historyToQueryString(history, startTick, endTick) {
+	static historyToQueryString(history, start, end, bpm) {
 		function toPaddedNumber(number) {
 			return number.toString().padStart(2, '0');
 		}
 		
-		const numSixteenthNotes = Math.floor((endTick - startTick) / 48) + 1;		
+		const s = 60 / (bpm * 4); // Length of a sixteenth note in seconds
+		const numSixteenthNotes = Math.floor((end - start) / s) + 1;
 		const orderedNotes = Array.from({ length: numSixteenthNotes }, () => [])
 		
 		for (const n of history) {
-			const p = Tone.Time(n.position).toTicks(); // Position of current note in Ticks
-			if (p <= endTick) {
-				const t = Math.floor((p - startTick) / 48); // Delta between note and startTick in SixteenthNotes
+			if (n.time <= end) {
+				const t = Math.floor((n.time - start) / s); // Delta between note and startTick in SixteenthNotes
 				const velocity = Math.max(Math.min(Math.round((n.velocity * 100) - 1), 99), 0); // Velocity scaled to be 0-indexed, between 0 and 99
-				const duration = Math.max(Math.min(Math.round(n.duration), 99), 1);
-				const noteStr = `${toPaddedNumber(n.keyNum)}${toPaddedNumber(velocity)}${toPaddedNumber(duration)}`;
+				const duration = Math.max(Math.min(Math.round(n.duration / s), 99), 1);
+				const noteStr = `${toPaddedNumber(n.key.keyNum)}${toPaddedNumber(velocity)}${toPaddedNumber(duration)}`;
 				orderedNotes[t].push(noteStr);
 			}
 		}
@@ -68,31 +69,24 @@ class PianolaModel {
 		}
 	}
 	
-	async generateNotes(prevHistory, start, end, buffer) {
+	async generateNotes(history, start, end, bpm) {
 		/*
 		Arguments:
-			`prevHistory`: an array containing recent history of Notes that were played
-			`start`: the TransportTime (in Ticks) for the start of history period
-			`end`: the TransportTime (in Ticks) for the end of history period
-			`buffer`: the buffer duration (Tone.Time in Ticks) to add to end of history period
-		Note: `start` and `end` define the range of time that is provided and do not correspond to events in `prevHistory`
+			`history`: an array containing recent history of Notes that were played
+			`start`: the TransportTime (in seconds) for the start of history period
+			`end`: the TransportTime (in seconds) for the end of history period
+			`bpm`: beats per minute that the notes in `history` were played at
 		*/
-		
-		// Get "history" from buffer (i.e. notes queued up to be played) and combine with prevHistory (i.e. notes that have been played)
-		const recentNoteHistory = Note.getRecentHistory(this.noteHistory, end);
-		recentNoteHistory.push(...prevHistory);
-		
-		const queryString = PianolaModel.historyToQueryString(recentNoteHistory, start, end+buffer);
+		const queryString = PianolaModel.historyToQueryString(history, start, end, bpm);
 		console.log('Query:', queryString);
 		const data = await this.queryModel(queryString);
 		console.log('Data:', data);
 		
 		var generated = [];
 		if (!data.hasOwnProperty('message')) {
-			const newBasePosition = end + buffer + 48; // New notes will start 1 timestep (i.e. 48 ticks) after the end+buffer window
-			generated = PianolaModel.queryStringToNotes(data, newBasePosition);
+			const generatedStart = end + (60 / (bpm * 4)); // New notes will start a sixteenth note after `end` time
+			generated = PianolaModel.queryStringToNotes(data, generatedStart, bpm);
 		}
-		this.noteHistory.push(...generated);
-		return generated;
+		return generated
 	}
 }
