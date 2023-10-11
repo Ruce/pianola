@@ -14,7 +14,7 @@ from transformers import LlamaConfig
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer, _make_causal_mask
 
 class InceptionModel(nn.Module):
-    def __init__(self, num_notes):
+    def __init__(self, num_notes, out_dim):
         super().__init__()
         self.conv1_1 = nn.Conv1d(2, 2, kernel_size=1, stride=1, padding=0)
         self.conv3_1 = nn.Conv1d(2, 10, kernel_size=3, stride=1, padding=1)
@@ -34,7 +34,7 @@ class InceptionModel(nn.Module):
         self.avgpool = nn.AvgPool1d(kernel_size=3, stride=2, padding=1)
         self.flatten = nn.Flatten()
 
-        self.linear1 = nn.Linear(768, 128)
+        self.linear1 = nn.Linear(768, out_dim)
 
     def forward(self, x):
         # Flatten the batch and timestep dimensions into first dimension, and swap the features and channels dimensions
@@ -208,7 +208,7 @@ class LalaE(nn.Module):
     def __init__(self, config, num_notes, chain_emb_dim, chain_length, dropout=0.1):
         super().__init__()
         self.config = config
-        self.incep = InceptionModel(num_notes)
+        self.incep = InceptionModel(num_notes, config.hidden_size)
         self.lalama = Lalama(config, dropout)
         self.chain = ChainClassifier(num_notes, config.hidden_size, chain_emb_dim, chain_length)
         self.velocity = FeatureModule(num_notes, config.hidden_size)
