@@ -85,11 +85,11 @@ class Piano {
 	}
 	
 	keyPressed(keyNum) {
-		this.lastActivity = new Date();
 		if (this.startTone()) {
 			this.seedInputListener();
 		}
 		this.playNote(this.pianoKeys[keyNum], 0.8, -1, Actor.Player);
+		this.lastActivity = new Date();
 	}
 	
 	keyDown(event) {
@@ -113,14 +113,8 @@ class Piano {
 	}
 	
 	playNote(pianoKey, velocity, duration, actor, contextTime, triggerTime=Tone.Transport.seconds) {
-		const currTime = new Date();
-		const note = new Note(pianoKey, velocity, duration, triggerTime, actor);
-		
 		// Check if pianoKey is already active, i.e. note is played again while currently held down, and if so release it
 		this.releaseNote(pianoKey, triggerTime);
-		
-		this.activeNotes.push(note);
-		this.noteHistory.push(note);
 		if (duration === -1) {
 			// Note is being held down
 			this.sampler.triggerAttack(pianoKey.keyName, contextTime, velocity);
@@ -129,7 +123,13 @@ class Piano {
 			this.sampler.triggerAttackRelease(pianoKey.keyName, triggerDuration, contextTime, velocity);
 		}
 		
+		// Keep track of note in `activeNotes` and `noteHistory`
+		const note = new Note(pianoKey, velocity, duration, triggerTime, actor);
+		this.activeNotes.push(note);
+		this.noteHistory.push(note);
+		
 		// Draw note on canvases
+		const currTime = new Date();
 		let endTime = -1;
 		if (duration !== -1) {
 			endTime = new Date(currTime);
