@@ -36,6 +36,9 @@ function initialisePage() {
 		NProgress.set(0.8);
 		setTimeout(() => loadingComplete(), 300);
 	});
+	
+	document.addEventListener("keydown", (event) => piano.keyDown(event));
+	document.addEventListener("keyup", (event) => piano.keyUp(event));
 }
 
 function loadingComplete() {
@@ -121,8 +124,6 @@ function closeOverlay() {
 
 document.addEventListener("DOMContentLoaded", initialisePage);
 document.addEventListener("mouseup", () => globalMouseDown = false);
-document.addEventListener("keydown", (event) => piano.keyDown(event));
-document.addEventListener("keyup", (event) => piano.keyUp(event));
 
 var resizeTimeout = false;
 const resizeDelay = 40;

@@ -232,6 +232,7 @@ class Piano {
 		Tone.Transport.cancel();
 		Tone.Transport.stop();
 		this.noteHistory = [];
+		this.activeNotes = [];
 		this.toneStarted = false;
 		
 		if (typeof this.listenerIntervalId !== 'undefined') {
@@ -563,7 +564,7 @@ class PianoCanvas {
 		ctx.font = keyFont;
 		
 		// Remove expired keys and get the colourKeyNums for active keys
-		this.piano.activeNotes = this.piano.activeNotes.filter(n => n.duration === -1 || n.time + n.duration < Tone.Transport.seconds);
+		this.piano.activeNotes = this.piano.activeNotes.filter(n => n.duration === -1 || n.time + n.duration > Tone.Transport.seconds);
 		function getActiveKeyNums(activeNotes, actor, getWhiteKey) {
 			return activeNotes.filter(n => (n.key.isWhiteKey === getWhiteKey) && (n.actor === actor)).map(n => n.key.colourKeyNum);
 		}
