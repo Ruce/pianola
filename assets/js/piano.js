@@ -12,10 +12,11 @@ class Piano {
 		
 		this.toneStarted = false;
 		this.lastActivity = new Date();
-		this.modelStartTime = new Date();
+		this.modelStartTime = null;
 		this.activeNotes = [];
 		this.noteHistory = [];
 		this.noteQueue = [];
+		this.noteBuffer = [];
 		
 		this.bufferBeats = 4;
 		this.bufferTicks = Tone.Time(`0:${this.bufferBeats}`).toTicks();
@@ -88,14 +89,14 @@ class Piano {
 		if (this.startTone()) {
 			this.seedInputListener();
 		}
-		this.playNote(this.pianoKeys[keyNum], 0.8, -1, Actor.Player);
+		this.playNote(new Note(this.pianoKeys[keyNum], 0.8, -1, Tone.Transport.seconds, Actor.Player));
 		this.lastActivity = new Date();
 	}
 	
 	keyDown(event) {
 		if (event.repeat) return;
 		if (event.key === ' ') {
-			this.stopModel();
+			this.resetAll();
 		}
 		
 		const keyNum = this.keyMap[event.key];
@@ -112,36 +113,34 @@ class Piano {
 		}
 	}
 	
-	playNote(pianoKey, velocity, duration, actor, contextTime, triggerTime=Tone.Transport.seconds) {
+	playNote(note, contextTime) {
 		// Check if pianoKey is already active, i.e. note is played again while currently held down, and if so release it
-		this.releaseNote(pianoKey, triggerTime);
-		if (duration === -1) {
+		this.releaseNote(note.key, note.time);
+		if (note.duration === -1) {
 			// Note is being held down
-			this.sampler.triggerAttack(pianoKey.keyName, contextTime, velocity);
+			this.sampler.triggerAttack(note.key.keyName, contextTime, note.velocity);
 		} else {
-			const triggerDuration = duration + 0.15; // Add a short delay to the end of the sound (in seconds)
-			this.sampler.triggerAttackRelease(pianoKey.keyName, triggerDuration, contextTime, velocity);
+			const triggerDuration = note.duration + 0.15; // Add a short delay to the end of the sound (in seconds)
+			this.sampler.triggerAttackRelease(note.key.keyName, triggerDuration, contextTime, note.velocity);
 		}
 		
 		// Keep track of note in `activeNotes` and `noteHistory`
-		const note = new Note(pianoKey, velocity, duration, triggerTime, actor);
 		this.activeNotes.push(note);
 		this.noteHistory.push(note);
 		
 		// Draw note on canvases
 		const currTime = new Date();
 		let endTime = -1;
-		if (duration !== -1) {
+		if (note.duration !== -1) {
 			endTime = new Date(currTime);
-			const durationMilliseconds = (duration * 1000) * 0.9 - 15; // Shorten duration slightly to add a gap between notes
+			const durationMilliseconds = (note.duration * 1000) * 0.9 - 15; // Shorten duration slightly to add a gap between notes
 			endTime.setMilliseconds(endTime.getMilliseconds() + durationMilliseconds);
 		}
 		this.pianoCanvas.triggerDraw();
-		this.notesCanvas.addNoteBar(pianoKey, currTime, endTime, actor);
+		this.notesCanvas.addNoteBar(note.key, currTime, endTime, note.actor);
 		
 		// Remove note from noteQueue if exists
-		const queuedNote = this.noteQueue.find(note => note.key === pianoKey && note.actor === actor && note.time === triggerTime);
-		const noteIndex = this.noteQueue.indexOf(queuedNote);
+		const noteIndex = this.noteQueue.indexOf(note);
 		if (noteIndex > -1) this.noteQueue.splice(noteIndex, 1);
 	}
 	
@@ -166,12 +165,12 @@ class Piano {
 		}
 	}
 	
-	scheduleNote(pianoKey, velocity, duration, triggerTime, actor) {
-		const scheduleId = Tone.Transport.scheduleOnce((time) => this.playNote(pianoKey, velocity, duration, actor, time, triggerTime), triggerTime);
-		this.noteQueue.push(new Note(pianoKey, velocity, duration, triggerTime, actor, scheduleId));
+	scheduleNote(note) {
+		note.scheduleId = Tone.Transport.scheduleOnce((contextTime) => this.playNote(note, contextTime), note.time);
+		this.noteQueue.push(note);
 	}
 	
-	async callModel() {
+	async callModel(scheduleImmediately=true) {
 		const initiatedTime = new Date();
 		const offset = this.beatsToSeconds(1/4) / 2; // Start the window at half of an interval (sixteenth note) earlier so that notes are centered
 		const start = Math.max(this.callModelEnd - this.beatsToSeconds(this.historyWindowBeats), 0) - offset;
@@ -181,9 +180,14 @@ class Piano {
 		
 		const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.bpm, this.bufferBeats * 4);
 		// Before scheduling notes, check that the model hasn't been restarted while this function was awaiting a response
-		if (initiatedTime >= this.modelStartTime) {
-			for (const note of generated) {
-				this.scheduleNote(this.pianoKeys[note.keyNum], note.velocity, note.duration, note.time, Actor.Model);
+		if (this.modelStartTime !== null && initiatedTime >= this.modelStartTime) {
+			for (const gen of generated) {
+				const note = new Note(this.pianoKeys[gen.keyNum], gen.velocity, gen.duration, gen.time, Actor.Model);
+				if (scheduleImmediately) {
+					this.scheduleNote(note);
+				} else {
+					this.noteBuffer.push(note);
+				}
 			}
 			this.callModelEnd += this.beatsToSeconds(this.bufferBeats);
 		}
@@ -193,29 +197,26 @@ class Piano {
 		const timeout = 5 * 60 * 1000; // in milliseconds
 		if (new Date() - this.lastActivity > timeout) {
 			console.log('No user activity, stopping model...');
-			this.stopModel();
+			this.resetAll();
 		}
 	}
 	
-	startModel() {
+	startModel(startGlowDelay) {
 		this.modelStartTime = new Date();
 		this.callModel(); // Call model immediately, since setInterval first triggers function after the delay
 		this.callModelIntervalId = setInterval(() => this.callModel(), this.beatsToSeconds(this.bufferBeats) * 1000);
 		this.checkActivityIntervalId = setInterval(() => this.checkActivity(), 5000);
-		this.notesCanvas.startGlow(this.beatsToSeconds(this.bufferBeats) * 1000);
+		this.notesCanvas.startGlow(startGlowDelay);
 	}
 	
 	stopModel() {
-		this.releaseAllNotes();
 		this.notesCanvas.endGlow();
-		Tone.Transport.cancel();
-		Tone.Transport.stop();
-		
-		this.noteHistory = [];
+		for (const note of this.noteQueue) {
+			Tone.Transport.clear(note.scheduleId);
+		}
 		this.noteQueue = [];
-		this.model.noteHistory = [];
-		this.modelStartTime = new Date();
-		this.toneStarted = false;
+		this.noteBuffer = [];
+		this.modelStartTime = null;
 		
 		if (typeof this.callModelIntervalId !== 'undefined') {
 			clearInterval(this.callModelIntervalId);
@@ -223,6 +224,16 @@ class Piano {
 		if (typeof this.checkActivityIntervalId !== 'undefined') {
 			clearInterval(this.checkActivityIntervalId);
 		}
+	}
+	
+	resetAll() {
+		this.releaseAllNotes();
+		this.stopModel();
+		Tone.Transport.cancel();
+		Tone.Transport.stop();
+		this.noteHistory = [];
+		this.toneStarted = false;
+		
 		if (typeof this.listenerIntervalId !== 'undefined') {
 			clearInterval(this.listenerIntervalId);
 			document.getElementById("listener").style.visibility = "hidden";
@@ -236,31 +247,45 @@ class Piano {
 		document.getElementById("listener").style.visibility = "visible";
 		
 		// Start up the awaiter
-		this.listenerIntervalId = setInterval(this.seedInputAwaiter.bind(this), 100);
+		this.listenerIntervalId = setInterval(this.seedInputAwaiter.bind(this), 50);
 	}
 	
 	seedInputAwaiter() {
 		const currTime = new Date();
-		if (currTime - this.lastActivity > 2500 && this.activeNotes.length === 0) {
-			clearInterval(this.listenerIntervalId);
-			
-			// Detect tempo from user input
-			this.bpm = this.detectBpm();
-			
-			// Add an interval (sixteenth note) at the end of user passage to smooth out playback
-			this.callModelEnd = this.noteHistory.at(-1).time + this.beatsToSeconds(1/4);
-			
-			// Rewind the transport schedule to the last of the seed input so that the history fed to the model is seamless
-			Tone.Transport.seconds = this.callModelEnd - this.beatsToSeconds(this.bufferBeats);
-			this.startModel();
-			
-			// Hide the listening visual indicator
-			document.getElementById("listener").style.visibility = "hidden";
+		const inputWaitTime = 1000; // Number of milliseconds to wait for end of player input before starting model
+		
+		if (this.modelStartTime === null) {
+			if (currTime - this.lastActivity >= inputWaitTime && this.activeNotes.length === 0) {
+				// Start the model:
+				// Detect tempo from user input
+				this.bpm = this.detectBpm();
+				
+				// Add an interval (sixteenth note) at the end of user passage to smooth out playback
+				this.callModelEnd = this.noteHistory.at(-1).time + this.beatsToSeconds(1/4);
+				this.modelStartTime = currTime;
+				this.callModel(false);
+			}
+		} else {
+			if (currTime - this.lastActivity < inputWaitTime) {
+				// Model was started but new input has been received, reset model and notes queue
+				this.stopModel();
+			//} else if (currTime - this.lastActivity >= inputWaitTime + this.beatsToSeconds(this.bufferBeats)*1000) {
+			} else if (currTime - this.lastActivity >= inputWaitTime * 3) {
+				// Rewind the transport schedule to the last of the seed input so that the history fed to the model is seamless
+				Tone.Transport.seconds = this.callModelEnd - this.beatsToSeconds(this.bufferBeats);
+				Array.from(this.noteBuffer, (note) => this.scheduleNote(note));
+				this.noteBuffer = [];
+				this.startModel(0);
+				
+				// Hide the listening visual indicator and stop awaiter
+				document.getElementById("listener").style.visibility = "hidden";
+				clearInterval(this.listenerIntervalId);
+			}
 		}
 	}
 	
 	playExample(data, bpm) {
-		this.stopModel();
+		this.resetAll();
 		this.setBPM(bpm);
 		this.startTone();
 		this.lastActivity = new Date();
@@ -268,12 +293,13 @@ class Piano {
 		const start = Tone.Transport.seconds;
 		const notes = PianolaModel.queryStringToNotes(data, start, this.bpm);
 		for (const note of notes) {
-			this.scheduleNote(this.pianoKeys[note.keyNum], note.velocity, note.duration, note.time, Actor.Bot);
+			this.scheduleNote(new Note(this.pianoKeys[note.keyNum], note.velocity, note.duration, note.time, Actor.Bot));
 		}
 		
 		// Schedule startModel to trigger one buffer period before the last note
 		this.callModelEnd = notes.at(-1).time;
-		Tone.Transport.scheduleOnce(() => this.startModel(), Math.max(0, this.callModelEnd - this.beatsToSeconds(this.bufferBeats)));
+		const startGlowDelay = this.beatsToSeconds(this.bufferBeats) * 1000;
+		Tone.Transport.scheduleOnce(() => this.startModel(startGlowDelay), Math.max(0, this.callModelEnd - this.beatsToSeconds(this.bufferBeats)));
 	}
 	
 	changeVolume(volume) {

@@ -102,7 +102,7 @@ function toggleMute() {
 
 function stopMusic() {
 	if (typeof piano !== 'undefined') {
-		piano.stopModel();
+		piano.resetAll();
 	}
 }
 
