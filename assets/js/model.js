@@ -1,6 +1,9 @@
 class PianolaModel {
 	constructor(endpoint) {
 		this.endpoint = endpoint;
+		this.lastActivity = null;
+		this.lastQuery = null;
+		this.keepAliveIntervalId = setInterval(() => this.keepAlive(), 10000);
 	}
 		
 	static queryStringToNotes(data, start, bpm) {
@@ -45,8 +48,9 @@ class PianolaModel {
 		return queryString;
 	}
 	
-	async queryModel(queryString) {
-		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString, timesteps: 16});
+	async queryModel(queryString, timesteps) {
+		this.lastQuery = new Date();
+		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString, timesteps: timesteps});
 		try {
 			const response = await fetch(endpointURI);
 			const data = await response.json();
@@ -57,8 +61,9 @@ class PianolaModel {
 	}
 	
 	async connectToModel(callback) {
-		const data = await this.queryModel(";");
-		console.log('Data:', data);
+		this.lastActivity = new Date();
+		const data = await this.queryModel(";", 1);
+		console.log(new Date().toISOString(), `Connected to model [${data}]`);
 		
 		if (typeof data !== 'undefined' && !data.hasOwnProperty('message')) {
 			// Expected response received, trigger callback
@@ -69,18 +74,20 @@ class PianolaModel {
 		}
 	}
 	
-	async generateNotes(history, start, end, bpm) {
+	async generateNotes(history, start, end, bpm, timesteps) {
 		/*
 		Arguments:
 			`history`: an array containing recent history of Notes that were played
 			`start`: the TransportTime (in seconds) for the start of history period
 			`end`: the TransportTime (in seconds) for the end of history period
 			`bpm`: beats per minute that the notes in `history` were played at
+			`timesteps`: number of timesteps to generate
 		*/
+		this.lastActivity = new Date();
 		const queryString = PianolaModel.historyToQueryString(history, start, end, bpm);
-		console.log('Query:', queryString);
-		const data = await this.queryModel(queryString);
-		console.log('Data:', data);
+		console.log(new Date().toISOString(), 'Query:', queryString);
+		const data = await this.queryModel(queryString, timesteps);
+		console.log(new Date().toISOString(), 'Data:', data);
 		
 		var generated = [];
 		if (!data.hasOwnProperty('message')) {
@@ -88,5 +95,15 @@ class PianolaModel {
 			generated = PianolaModel.queryStringToNotes(data, generatedStart, bpm);
 		}
 		return generated
+	}
+	
+	async keepAlive() {
+		const currTime = new Date();
+		const activityTimeout = 300000;
+		const queryInterval = 30000;
+		// If the model has been active in `activityTimeout` window and no queries have been made in the last `queryInterval`, query the model to keep it alive
+		if (this.lastActivity !== null && currTime - this.lastActivity < activityTimeout && this.lastQuery !== null && currTime - this.lastQuery > queryInterval) {
+			const data = await this.queryModel(";", 1);
+		}
 	}
 }
