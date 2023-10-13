@@ -18,9 +18,9 @@ class Piano {
 		this.noteQueue = [];
 		this.noteBuffer = [];
 		
-		this.bufferBeats = 4;
+		this.bufferBeats = 6;
 		this.bufferTicks = Tone.Time(`0:${this.bufferBeats}`).toTicks();
-		this.historyWindowBeats = 60;
+		this.historyWindowBeats = 58;
 		this.defaultBPM = 80;
 		this.setBPM(this.defaultBPM);
 	}
@@ -178,7 +178,9 @@ class Piano {
 		const queued = Note.getRecentHistory(this.noteQueue, start);
 		history.push(...queued);
 		
-		const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.bpm, this.bufferBeats * 4);
+		const numRepeats = 3;
+		const selectionIdx = 1;
+		const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.bpm, this.bufferBeats * 4, numRepeats, selectionIdx);
 		// Before scheduling notes, check that the model hasn't been restarted while this function was awaiting a response
 		if (this.modelStartTime !== null && initiatedTime >= this.modelStartTime) {
 			for (const gen of generated) {
