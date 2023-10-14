@@ -30,7 +30,7 @@ function initialisePage() {
 	piano = new Piano('pianoCanvas', octaves, model);
 	notesCanvas = new NotesCanvas('notesCanvas', piano);
 	initialiseVolumeSlider();
-	fetchSongExamples();
+	initialiseSeeds();
 	
 	Tone.ToneAudioBuffer.loaded().then(() => {
 		NProgress.set(0.8);
@@ -75,13 +75,25 @@ function initialiseVolumeSlider() {
 	});
 }
 
-function fetchSongExamples() {
+function initialiseSeeds() {
 	fetch('assets/songs/examples.json')
 	.then(response => response.json())
-	.then(data => exampleSongs = data)
+	.then(data => populateSeedList(data))
 	.catch(error => {
 		console.log('Error reading song examples JSON:', error);
 	});
+}
+
+function populateSeedList(exampleSongs) {
+	const numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+	const listContainer = document.getElementById('exampleList');
+	for (let i = 0; i < exampleSongs.songs.length; i++) {
+		const seed = exampleSongs.songs[i];
+		const seedElement = document.createElement('li');
+		seedElement.textContent = `Seed ${numerals[i]}: ${seed.name}`;
+		seedElement.addEventListener('click', () => piano.playExample(seed.data, seed.bpm));
+		listContainer.appendChild(seedElement);
+	}
 }
 
 function toggleMute() {
@@ -107,11 +119,6 @@ function stopMusic() {
 	if (typeof piano !== 'undefined') {
 		piano.resetAll();
 	}
-}
-
-function playExample(exampleNum) {
-	const song = exampleSongs.songs[exampleNum-1];
-	piano.playExample(song.data, song.bpm);
 }
 
 function openOverlay() {

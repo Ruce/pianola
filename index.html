@@ -16,22 +16,11 @@ layout: default
 	</div>
 	<div class="listener" id="listener"><p class="listenerText">Listening...</p></div>
 	<div class="menuContainer">
-		<button class="menuButton" onclick="stopMusic()"><div class="menuButtonShape stopButtonShape"></div><div class="menuButtonTooltip">Stop (space)</div></button>
 		<button class="menuButton playButton">
 			<div class="menuButtonShape playButtonShape"></div>
-			<ol class="exampleList">
-				<li onclick="playExample(1)">Seed I</li>
-				<li onclick="playExample(2)">Seed II</li>
-				<li onclick="playExample(3)">Seed III</li>
-				<li onclick="playExample(4)">Seed IV</li>
-				<li onclick="playExample(5)">Seed V</li>
-				<li onclick="playExample(6)">Seed VI</li>
-				<li onclick="playExample(7)">Seed VII</li>
-				<li onclick="playExample(8)">Seed VIII</li>
-				<li onclick="playExample(9)">Seed IX</li>
-				<li onclick="playExample(10)">Seed X</li>
-			</ol>
+			<ol id="exampleList"></ol>
 		</button>
+		<button class="menuButton" onclick="stopMusic()"><div class="menuButtonShape stopButtonShape"></div><div class="menuButtonTooltip">Stop (space)</div></button>
 		<button class="menuButton" onclick="openOverlay()"><div class="menuButtonShape helpButtonShape"><div class="helpButtonInner">i</div></div><div class="menuButtonTooltip">Help</div></button>
 		<button class="menuButton" onclick="toggleMute()"><div class="menuButtonShape volumeButtonShape" id="volumeButtonImage"></div><div class="menuButtonTooltip" id="menuMuteTooltip">Mute</div></button>
 		<input type="range" class="volumeSlider" id="volumeSlider" min="0" max="100" value="85">
