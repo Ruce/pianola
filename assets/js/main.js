@@ -129,7 +129,14 @@ function closeOverlay() {
     document.getElementById('overlay').style.display = 'none';
 }
 
+function pauseFramesCheck() {
+	if (notesCanvas && document.visibilityState === 'hidden') {
+		notesCanvas.lastAnimationCheck = null;
+	}
+}
+
 document.addEventListener("DOMContentLoaded", initialisePage);
+document.addEventListener("visibilitychange", pauseFramesCheck);
 document.addEventListener("mouseup", () => globalMouseDown = false);
 
 var resizeTimeout = false;

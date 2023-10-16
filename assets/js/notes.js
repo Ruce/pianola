@@ -23,19 +23,16 @@ class Note {
 		return recentHistory;
 	}
 	
-	static getRecentHistoryDeprecated(history, startTick) {
-		// Returns events in history that happened on or after `startTick`
+	static removeHistory(history, startTime) {
+		// Remove events in history that happened on or after `startTime`
 		// `history` must be an ordered list of events from first to most recent
-		const recentHistory = [];
+		// Returns new history array without altering original `history`
 		for (let i = history.length - 1; i >= 0; i--) {
-			const h = history[i];
-			if (Tone.Time(h.position).toTicks() >= startTick) {
-				recentHistory.unshift(h);
-			} else {
-				break;
+			if (history[i].time < startTime) {
+				return history.slice(0, i+1);
 			}
 		}
-		return recentHistory;
+		return [];
 	}
 	
 	getPosition(bpm) {
@@ -45,16 +42,18 @@ class Note {
 }
 
 class NoteBar {
-	constructor(pianoKey, lastUpdateTime, endTime, relativeX, actor) {
+	constructor(pianoKey, startTime, duration, bpm, relativeX, actor) {
 		this.keyNum = pianoKey.keyNum;
 		this.isWhiteKey = pianoKey.isWhiteKey;
-		this.lastUpdateTime = lastUpdateTime;
-		this.endTime = endTime;
+		this.startTime = startTime;
+		this.duration = duration;
+		this.bpm = bpm;
 		this.relativeX = relativeX;
 		this.actor = actor;
 		
 		this.relativeTop = 1;
 		this.relativeBot = 1;
+		this.lastUpdateTime = startTime;
 	}
 	
 	static get fill() {
@@ -90,13 +89,10 @@ class NotesCanvas {
 		this.triggerAnimation();
 	}
 	
-	addNoteBar(pianoKey, currTime, endTime, actor) {
-		const x = this.piano.pianoCanvas.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
+	addNoteBar(pianoKey, startTime, duration, bpm, actor) {const x = this.piano.pianoCanvas.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
 		const relativeX = x / this.canvas.width;
 		
-		// If this note was previously held, release it before playing the new note
-		this.releaseNote(pianoKey.keyNum, currTime);
-		const noteBar = new NoteBar(pianoKey, currTime, endTime, relativeX, actor);
+		const noteBar = new NoteBar(pianoKey, startTime, duration, bpm, relativeX, actor);
 		this.activeBars.push(noteBar);
 		
 		if (!this.animationActive) {
@@ -105,15 +101,11 @@ class NotesCanvas {
 		}
 	}
 	
-	releaseNote(keyNum, time) {
-		const activeBar = this.activeBars.find(noteBar => noteBar.keyNum === keyNum && (noteBar.endTime > time || noteBar.endTime === -1));
+	releaseNote(keyNum, finalDuration) {
+		const activeBar = this.activeBars.find(n => n.keyNum === keyNum && (n.duration === - 1 || n.duration > new Date() - n.startTime)); // Note that is held down or hasn't finished playing
 		if (typeof activeBar !== 'undefined') {
-			activeBar.endTime = time;
+			activeBar.duration = finalDuration + 0.02; // Add a small delta to increase height of note bar so it transitions smoothly upon release
 		}
-	}
-	
-	setBPM(bpm) {
-		this.bpm = bpm;
 	}
 	
 	triggerAnimation() {
@@ -204,21 +196,19 @@ class NotesCanvas {
 		// Draw note bars
 		const newActiveBars = [];
 		const currTime = new Date();
-		const noteLongevity = (6 / (this.bpm / 60)) * 1000; // Number of milliseconds that a note lives on screen (i.e. scrolls from bottom to top)
-		if (this.enableShadows) {
-			const shadowBlur = 7;
-			ctx.shadowBlur = shadowBlur;
-		}
+		const noteSpeedFactor = 6;
+		const noteLongevity = (noteSpeedFactor / (this.piano.bpm / 60)) * 1000; // Number of milliseconds that a note lives on screen (i.e. scrolls from bottom to top)
+		if (this.enableShadows) ctx.shadowBlur = 6;
 		for (const n of this.activeBars) {
 			const yDelta = (currTime - n.lastUpdateTime) / noteLongevity;
-			n.relativeTop = Math.max(n.relativeTop - yDelta, -NoteBar.minRelHeight*2);
-			if (n.endTime <= currTime && n.endTime != -1) {
-				n.relativeBot = Math.max(n.relativeBot - yDelta, -NoteBar.minRelHeight*2);
-			}
-			const rectX = n.relativeX * this.canvas.width;
-			const rectY = n.relativeTop * this.canvas.height;
-			const noteWidth = n.isWhiteKey ? this.piano.pianoCanvas.whiteKeyWidth : this.piano.pianoCanvas.blackKeyWidth;
-			const noteHeight = Math.max(n.relativeBot - n.relativeTop, NoteBar.minRelHeight) * this.canvas.height;
+			n.relativeTop -= yDelta;
+			const relativeHeight = Math.max((n.duration * (n.bpm / 60) / noteSpeedFactor) - 0.006, NoteBar.minRelHeight); // Add a small gap between consecutive notes
+			const relativeBot = n.duration === -1 ? 1 + NoteBar.minRelHeight*2 : n.relativeTop + relativeHeight;
+			
+			const rectX = n.relativeX * this.canvas.width + 1;
+			const rectY = Math.max(n.relativeTop, -NoteBar.minRelHeight*2) * this.canvas.height;
+			const noteWidth = n.isWhiteKey ? this.piano.pianoCanvas.whiteKeyWidth - 2 : this.piano.pianoCanvas.blackKeyWidth;
+			const noteHeight = Math.max((relativeBot * this.canvas.height) - rectY, 0);
 			
 			if (n.actor === Actor.Player) {
 				ctx.fillStyle = n.isWhiteKey ? NoteBar.fill.player.white : NoteBar.fill.player.black;
@@ -232,13 +222,13 @@ class NotesCanvas {
 			}
 			if (this.enableRoundRect) {
 				ctx.beginPath();
-				ctx.roundRect(rectX, rectY, noteWidth, noteHeight, 6);
+				ctx.roundRect(rectX, rectY, noteWidth, noteHeight, 7);
 				ctx.fill();
 			} else {
 				ctx.fillRect(rectX, rectY, noteWidth, noteHeight);
 			}
 			
-			if (n.relativeBot > -NoteBar.minRelHeight*2) {
+			if (relativeBot > -NoteBar.minRelHeight*2) {
 				n.lastUpdateTime = currTime;
 				newActiveBars.push(n);
 			}
