@@ -147,8 +147,9 @@ class NotesCanvas {
 	
 	draw(timestamp) {
 		const ctx = this.canvas.getContext('2d');
-		this.canvas.width = window.innerWidth;
-		this.canvas.height = window.innerHeight - this.piano.pianoCanvas.canvas.height;
+		this.canvas.width = this.canvas.offsetWidth;
+		this.canvas.height = this.canvas.offsetHeight;
+		
 		ctx.fillStyle = '#333333';
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		

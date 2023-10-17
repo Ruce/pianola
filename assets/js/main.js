@@ -29,8 +29,10 @@ function initialisePage() {
 	model.connectToModel(hideLoader);
 	piano = new Piano('pianoCanvas', octaves, model);
 	notesCanvas = new NotesCanvas('notesCanvas', piano);
+	
 	initialiseVolumeSlider();
 	initialiseSeeds();
+	initialiseRewindReceiver();
 	
 	Tone.ToneAudioBuffer.loaded().then(() => {
 		NProgress.set(0.8);
@@ -44,10 +46,14 @@ function initialisePage() {
 function loadingComplete() {
 	document.getElementById('content').style.display = 'block';
 	document.getElementById('preloader').classList.add('fade-out');
+	redrawCanvases();
 	NProgress.done()
 }
 
 function redrawCanvases() {
+	const pianoDiv = document.getElementById('pianoDiv');
+	const pianoHeight = window.innerWidth * PianoCanvas.keyboardRatio;
+	pianoDiv.style.height = pianoHeight + "px";
 	piano.pianoCanvas.triggerDraw();
 	notesCanvas.draw();
 }
@@ -83,6 +89,11 @@ function initialiseSeeds() {
 		console.log('Error reading song examples JSON:', error);
 	});
 }
+
+function initialiseRewindReceiver() {
+	document.getElementById("rewindReceiver").addEventListener('dblclick', () => piano.rewind());
+}
+
 
 function populateSeedList(exampleSongs) {
 	const numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];

@@ -10,6 +10,10 @@ layout: default
 	<div class="lds-preloader"><div></div><div></div><div></div></div>
 </div>
 <div id="content">
+	<div id="canvasContainer">
+		<div id="notesDiv"><canvas id="notesCanvas"></canvas><div id="rewindReceiver"></div></div>
+		<div id="pianoDiv"><canvas id="pianoCanvas"></canvas></div>
+	</div>
 	<div class="loaderContainer" id="connectionLoader">
 		<div class="loaderCircle" id="loaderCircle"><div class="loaderCheckmark" id="loaderCheckmark"></div></div>
 		<p class="loaderText" id="loaderText">Connecting to model...</p>
@@ -24,9 +28,6 @@ layout: default
 		<button class="menuButton" onclick="openOverlay()"><div class="menuButtonShape helpButtonShape"><div class="helpButtonInner">i</div></div><div class="menuButtonTooltip">Help</div></button>
 		<button class="menuButton" onclick="toggleMute()"><div class="menuButtonShape volumeButtonShape" id="volumeButtonImage"></div><div class="menuButtonTooltip" id="menuMuteTooltip">Mute</div></button>
 		<input type="range" class="volumeSlider" id="volumeSlider" min="0" max="100" value="85">
-	</div>
-	<div id="canvasContainer" class="canvasContainer">
-		<canvas id="notesCanvas"></canvas><canvas id="pianoCanvas"></canvas>
 	</div>
 </div>
 <div id="overlay">

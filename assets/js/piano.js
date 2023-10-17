@@ -611,8 +611,9 @@ class PianoCanvas {
 		const hoverKeyDefined = (this.hoverKey !== null);
 		
 		const ctx = this.canvas.getContext('2d');
-		this.canvas.width = window.innerWidth;
-		this.canvas.height = this.canvas.width * PianoCanvas.keyboardRatio;
+		this.canvas.width = this.canvas.offsetWidth;
+		this.canvas.height = this.canvas.offsetHeight;
+		
 		ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
 		this.whiteKeyWidth = this.canvas.width / this.numWhiteKeys;
