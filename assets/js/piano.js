@@ -321,6 +321,8 @@ class Piano {
 	}
 	
 	rewind() {
+		if (!this.toneStarted) return;
+		
 		this.stopModel();
 		this.activeNotes = [];
 		

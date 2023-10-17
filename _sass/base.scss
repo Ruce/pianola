@@ -127,11 +127,24 @@ canvas {
 }
 
 #rewindReceiver {
-	width: 15%;
+	width: 20%;
 	height: 100%;
 	position: absolute;
-	background: transparent;
-	display: block;
+	background-color: #333333;
+	background-image: linear-gradient(to right, #3B3B3B, transparent);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity 0.1s;
+}
+
+.rewindIcon {
+	position: absolute;
+	width: 30px;
+	height: 30px;
+	background-image: url('../img/rewind.svg');
+	background-size: cover;
 }
 
 .menuContainer {

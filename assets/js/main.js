@@ -91,7 +91,14 @@ function initialiseSeeds() {
 }
 
 function initialiseRewindReceiver() {
-	document.getElementById("rewindReceiver").addEventListener('dblclick', () => piano.rewind());
+	const rewindReceiver = document.getElementById("rewindReceiver");
+	
+	function rewind() {
+		piano.rewind();
+		rewindReceiver.style.opacity = 0.9;
+		setTimeout(() => rewindReceiver.style.opacity = 0, 350);
+	}
+	rewindReceiver.addEventListener('dblclick', () => rewind());
 }
 
 
