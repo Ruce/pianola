@@ -1,11 +1,12 @@
 class Note {
-	constructor(pianoKey, velocity, duration, time, actor, scheduleId) {
+	constructor(pianoKey, velocity, duration, time, actor, scheduleId, isRewind=false) {
 		this.key = pianoKey;
 		this.velocity = velocity;
 		this.duration = duration;
 		this.time = time;
 		this.actor = actor;
 		this.scheduleId = scheduleId;
+		this.isRewind = isRewind;
 	}
 	
 	static getRecentHistory(history, startTime) {
@@ -42,7 +43,7 @@ class Note {
 }
 
 class NoteBar {
-	constructor(pianoKey, startTime, duration, bpm, relativeX, actor) {
+	constructor(pianoKey, startTime, duration, bpm, relativeX, actor, isRewind) {
 		this.keyNum = pianoKey.keyNum;
 		this.isWhiteKey = pianoKey.isWhiteKey;
 		this.startTime = startTime;
@@ -50,6 +51,7 @@ class NoteBar {
 		this.bpm = bpm;
 		this.relativeX = relativeX;
 		this.actor = actor;
+		this.isRewind = isRewind;
 		
 		this.relativeTop = 1;
 		this.relativeBot = 1;
@@ -89,10 +91,11 @@ class NotesCanvas {
 		this.triggerAnimation();
 	}
 	
-	addNoteBar(pianoKey, startTime, duration, bpm, actor) {const x = this.piano.pianoCanvas.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
+	addNoteBar(pianoKey, startTime, duration, bpm, actor, isRewind) {
+		const x = this.piano.pianoCanvas.getXCoordByKey(pianoKey.isWhiteKey, pianoKey.colourKeyNum);
 		const relativeX = x / this.canvas.width;
 		
-		const noteBar = new NoteBar(pianoKey, startTime, duration, bpm, relativeX, actor);
+		const noteBar = new NoteBar(pianoKey, startTime, duration, bpm, relativeX, actor, isRewind);
 		this.activeBars.push(noteBar);
 		
 		if (!this.animationActive) {
@@ -210,6 +213,7 @@ class NotesCanvas {
 			const noteWidth = n.isWhiteKey ? this.piano.pianoCanvas.whiteKeyWidth - 2 : this.piano.pianoCanvas.blackKeyWidth;
 			const noteHeight = Math.max((relativeBot * this.canvas.height) - rectY, 0);
 			
+			ctx.globalAlpha = n.isRewind ? 0.4 : 1;
 			if (n.actor === Actor.Player) {
 				ctx.fillStyle = n.isWhiteKey ? NoteBar.fill.player.white : NoteBar.fill.player.black;
 				ctx.shadowColor = NoteBar.fill.player.shadow;

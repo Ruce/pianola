@@ -31,11 +31,11 @@ class PianolaModel {
 		}
 		
 		const s = 60 / (bpm * 4); // Length of a sixteenth note in seconds
-		const numSixteenthNotes = Math.floor((end - start) / s) + 1;
-		const orderedNotes = Array.from({ length: numSixteenthNotes }, () => [])
+		const numSixteenthNotes = Math.round((end - start) / s);
+		const orderedNotes = Array.from({ length: numSixteenthNotes }, () => []);
 		
 		for (const n of history) {
-			if (n.time <= end) {
+			if (n.time < end) {
 				const t = Math.floor((n.time - start) / s); // Delta between note and startTick in SixteenthNotes
 				const velocity = Math.max(Math.min(Math.round((n.velocity * 100) - 1), 99), 0); // Velocity scaled to be 0-indexed, between 0 and 99
 				const duration = Math.max(Math.min(Math.round(n.duration / s), 99), 1);
@@ -91,7 +91,8 @@ class PianolaModel {
 		
 		var generated = [];
 		if (!data.hasOwnProperty('message')) {
-			const generatedStart = end + (60 / (bpm * 4)); // New notes will start a sixteenth note after `end` time
+			const offset = 15 / (bpm * 2); // Half of a 16th-note interval
+			const generatedStart = end + offset; // Generated notes start at an offset (i.e. half an interval) from the end time so that they are centered
 			generated = PianolaModel.queryStringToNotes(data, generatedStart, bpm);
 		}
 		return generated

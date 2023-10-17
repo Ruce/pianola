@@ -76,6 +76,14 @@ class Piano {
 		return (beats / this.bpm) * 60;
 	}
 	
+	roundToOffset(time) {
+		// Rounds up `time` to the nearest interval that is offset by half a timestep
+		// Primarily used for calculating callModelEnd time
+		const interval = this.beatsToSeconds(1/4);
+		const remainder = (time + (interval / 2)) % interval;
+		return time - remainder + interval;
+	}
+	
 	detectBpm(lowestBpm=60, highestBpm=110) {
 		const ticksPerSec = 480;
 		const noteTimings = Array.from(this.noteHistory, (n) => n.time * ticksPerSec);
@@ -139,7 +147,7 @@ class Piano {
 		const startTime = new Date(this.contextDateTime);
 		startTime.setMilliseconds(startTime.getMilliseconds() + (contextTime * 1000));
 		this.pianoCanvas.triggerDraw();
-		this.notesCanvas.addNoteBar(note.key, startTime, note.duration, this.bpm, note.actor);
+		this.notesCanvas.addNoteBar(note.key, startTime, note.duration, this.bpm, note.actor, note.isRewind);
 		
 		// Remove note from noteQueue if exists
 		const noteIndex = this.noteQueue.indexOf(note);
@@ -178,7 +186,7 @@ class Piano {
 	async callModel(scheduleImmediately=true) {
 		const initiatedTime = new Date();
 		const offset = this.beatsToSeconds(1/4) / 2; // Start the window at half of an interval (sixteenth note) earlier so that notes are centered
-		const start = Math.max(this.callModelEnd - this.beatsToSeconds(this.historyWindowBeats), 0) - offset;
+		const start = Math.max(this.callModelEnd - this.beatsToSeconds(this.historyWindowBeats), -offset);
 		const history = Note.getRecentHistory(this.noteHistory, start);
 		const queued = Note.getRecentHistory(this.noteQueue, start);
 		history.push(...queued);
@@ -268,8 +276,9 @@ class Piano {
 				// Detect tempo from user input
 				this.bpm = this.detectBpm();
 				
-				// Add an interval (sixteenth note) at the end of user passage to smooth out playback
-				this.callModelEnd = this.noteHistory.at(-1).time + this.beatsToSeconds(1/4);
+				// To determine end time of the seed passage, round up the last note's time to an interval boundary
+				const lastNoteTime = this.noteHistory.at(-1).time;
+				this.callModelEnd = this.roundToOffset(lastNoteTime);
 				this.modelStartTime = currTime;
 				this.callModel(false);
 			}
@@ -305,7 +314,8 @@ class Piano {
 		}
 		
 		// Schedule startModel to trigger one buffer period before the last note
-		this.callModelEnd = notes.at(-1).time;
+		const lastNoteTime = notes.at(-1).time;
+		this.callModelEnd = this.roundToOffset(lastNoteTime);
 		const startGlowDelay = this.beatsToSeconds(this.bufferBeats) * 1000;
 		Tone.Transport.scheduleOnce(() => this.startModel(startGlowDelay), Math.max(0, this.callModelEnd - this.beatsToSeconds(this.bufferBeats)));
 	}
@@ -314,34 +324,43 @@ class Piano {
 		this.stopModel();
 		this.activeNotes = [];
 		
-		const rewindSeconds = 6;
-		const newPositionSeconds = Math.max(Tone.Transport.seconds - rewindSeconds, 0);
-		Tone.Transport.seconds = newPositionSeconds;
+		const secondsToRewind = 8;
+		const newTransportSeconds = Math.max(this.roundToOffset(Tone.Transport.seconds - secondsToRewind), -this.beatsToSeconds(1/8));
 		
-		const replaySeconds = 3; // Number of seconds of history to replay before generating new notes; also acts as buffer
-		this.callModelEnd = newPositionSeconds + replaySeconds;
-		const replayNotes = Note.removeHistory(Note.getRecentHistory(this.noteHistory, newPositionSeconds), this.callModelEnd); // Get future notes within replay window
-		this.noteHistory = Note.removeHistory(this.noteHistory, newPositionSeconds);
+		// Align the actual new transport time to match the playback intervals
+		Tone.Transport.seconds = newTransportSeconds;
+		
+		const secondsToReplay = 3; // Number of seconds of history to replay before generating new notes; also acts as buffer
+		const replayTimesteps = Math.ceil(4 * secondsToReplay * this.bpm / 60); // Number of timesteps (16th-notes) to replay, based on ideal `secondsToReplay`
+		const replaySeconds = this.beatsToSeconds(replayTimesteps / 4);
+		this.callModelEnd = newTransportSeconds + replaySeconds;
+		
+		 // Get future notes within replay window
+		const replayNotes = Note.removeHistory(Note.getRecentHistory(this.noteHistory, newTransportSeconds), this.callModelEnd);
+		this.noteHistory = Note.removeHistory(this.noteHistory, newTransportSeconds);
 		for (const note of replayNotes) {
-			note.actor = Actor.Bot;
+			note.isRewind = true;
 			this.scheduleNote(note);
 		}
 		
 		// Redraw notes
 		if (this.notesCanvas) {
 			this.notesCanvas.activeBars = [];
-			const redrawSeconds = 5;
+			const redrawSeconds = 6;
 			const currTime = new Date();
-			const redrawNotes = Note.getRecentHistory(this.noteHistory, newPositionSeconds - redrawSeconds);
+			const redrawNotes = Note.getRecentHistory(this.noteHistory, newTransportSeconds - redrawSeconds);
 			for (const note of redrawNotes) {
 				const startTime = new Date(currTime);
-				const timePassedMilliseconds = (newPositionSeconds - note.time) * 1000;
+				const timePassedMilliseconds = (newTransportSeconds - note.time) * 1000;
 				startTime.setMilliseconds(startTime.getMilliseconds() - timePassedMilliseconds);
-				this.notesCanvas.addNoteBar(note.key, startTime, note.duration, this.bpm, note.actor);
+				this.notesCanvas.addNoteBar(note.key, startTime, note.duration, this.bpm, note.actor, true);
 			}
 		}
 		
-		this.startModel(replaySeconds * 1000);
+		// Wait a short delay before calling model in case user rewinds multiple times
+		const startModelDelayMs = 800;
+		if (this.startModelScheduleId) clearTimeout(this.startModelScheduleId);
+		this.startModelScheduleId = setTimeout(() => this.startModel(replaySeconds * 1000 - startModelDelayMs), startModelDelayMs);
 	}
 	
 	changeVolume(volume) {
