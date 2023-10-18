@@ -13,6 +13,7 @@ class Piano {
 		this.toneStarted = false;
 		this.lastActivity = new Date();
 		this.modelStartTime = null;
+		this.seedLastNoteTime = null;
 		this.activeNotes = [];
 		this.noteHistory = [];
 		this.noteQueue = [];
@@ -106,6 +107,8 @@ class Piano {
 	
 	keyDown(event) {
 		if (event.repeat) return;
+		
+		this.lastActivity = new Date();
 		if (event.key === ' ') {
 			this.resetAll();
 		}
@@ -249,6 +252,7 @@ class Piano {
 		this.noteHistory = [];
 		this.activeNotes = [];
 		this.toneStarted = false;
+		this.seedLastNoteTime = null;
 		
 		if (typeof this.listenerIntervalId !== 'undefined') {
 			clearInterval(this.listenerIntervalId);
@@ -263,6 +267,7 @@ class Piano {
 		document.getElementById("listener").style.visibility = "visible";
 		
 		// Start up the awaiter
+		this.awaitingInput = true;
 		this.listenerIntervalId = setInterval(this.seedInputAwaiter.bind(this), 50);
 	}
 	
@@ -277,8 +282,8 @@ class Piano {
 				this.bpm = this.detectBpm();
 				
 				// To determine end time of the seed passage, round up the last note's time to an interval boundary
-				const lastNoteTime = this.noteHistory.at(-1).time;
-				this.callModelEnd = this.roundToOffset(lastNoteTime);
+				this.seedLastNoteTime = this.noteHistory.at(-1).time;
+				this.callModelEnd = this.roundToOffset(this.seedLastNoteTime);
 				this.modelStartTime = currTime;
 				this.callModel(false);
 			}
@@ -286,15 +291,16 @@ class Piano {
 			if (currTime - this.lastActivity < inputWaitTime) {
 				// Model was started but new input has been received, reset model and notes queue
 				this.stopModel();
-			//} else if (currTime - this.lastActivity >= inputWaitTime + this.beatsToSeconds(this.bufferBeats)*1000) {
 			} else if (currTime - this.lastActivity >= inputWaitTime * 3) {
 				// Rewind the transport schedule to the last of the seed input so that the history fed to the model is seamless
+				// Subtract buffer seconds since callModel() adds it to callModelEnd
 				Tone.Transport.seconds = this.callModelEnd - this.beatsToSeconds(this.bufferBeats);
 				Array.from(this.noteBuffer, (note) => this.scheduleNote(note));
 				this.noteBuffer = [];
 				this.startModel(0);
 				
 				// Hide the listening visual indicator and stop awaiter
+				this.awaitingInput = false;
 				document.getElementById("listener").style.visibility = "hidden";
 				clearInterval(this.listenerIntervalId);
 			}
@@ -314,27 +320,29 @@ class Piano {
 		}
 		
 		// Schedule startModel to trigger one buffer period before the last note
-		const lastNoteTime = notes.at(-1).time;
-		this.callModelEnd = this.roundToOffset(lastNoteTime);
+		this.seedLastNoteTime = notes.at(-1).time;
+		this.callModelEnd = this.roundToOffset(this.seedLastNoteTime);
 		const startGlowDelay = this.beatsToSeconds(this.bufferBeats) * 1000;
 		Tone.Transport.scheduleOnce(() => this.startModel(startGlowDelay), Math.max(0, this.callModelEnd - this.beatsToSeconds(this.bufferBeats)));
 	}
 	
 	rewind() {
-		if (!this.toneStarted) return;
+		if (!this.toneStarted || this.awaitingInput) return false;
+		
+		// Commit queued notes into noteHistory before they are cleared
+		this.noteHistory.push(...this.noteQueue);
 		
 		this.stopModel();
 		this.activeNotes = [];
 		
 		const secondsToRewind = 8;
-		const newTransportSeconds = Math.max(this.roundToOffset(Tone.Transport.seconds - secondsToRewind), -this.beatsToSeconds(1/8));
-		
-		// Align the actual new transport time to match the playback intervals
-		Tone.Transport.seconds = newTransportSeconds;
-		
 		const secondsToReplay = 3; // Number of seconds of history to replay before generating new notes; also acts as buffer
 		const replayTimesteps = Math.ceil(4 * secondsToReplay * this.bpm / 60); // Number of timesteps (16th-notes) to replay, based on ideal `secondsToReplay`
 		const replaySeconds = this.beatsToSeconds(replayTimesteps / 4);
+		
+		// Rewind the transport but no further back than the last seed note
+		const newTransportSeconds = this.roundToOffset(Math.max(Tone.Transport.seconds - secondsToRewind, this.seedLastNoteTime - replaySeconds));
+		Tone.Transport.seconds = newTransportSeconds;
 		this.callModelEnd = newTransportSeconds + replaySeconds;
 		
 		 // Get future notes within replay window
@@ -363,6 +371,8 @@ class Piano {
 		const startModelDelayMs = 800;
 		if (this.startModelScheduleId) clearTimeout(this.startModelScheduleId);
 		this.startModelScheduleId = setTimeout(() => this.startModel(replaySeconds * 1000 - startModelDelayMs), startModelDelayMs);
+		
+		return true;
 	}
 	
 	changeVolume(volume) {

@@ -130,7 +130,6 @@ canvas {
 	width: 20%;
 	height: 100%;
 	position: absolute;
-	background-color: #333333;
 	background-image: linear-gradient(to right, #3B3B3B, transparent);
 	display: flex;
 	align-items: center;
@@ -145,6 +144,7 @@ canvas {
 	height: 30px;
 	background-image: url('../img/rewind.svg');
 	background-size: cover;
+	user-select: none;
 }
 
 .menuContainer {
@@ -152,7 +152,7 @@ canvas {
 	top: 10px;
 	left: 50%;
 	transform: translateX(-50%);
-	width: 310px;
+	width: 370px;
 	height: 35px;
 	background-color: $menuBackgroundColor;
 	opacity: 0.95;
@@ -242,6 +242,11 @@ canvas {
 	margin: 2px;
 }
 
+.rewindButtonShape {
+	background-image: url('../img/rewind.svg');
+	background-size: cover;
+}
+
 .stopButtonShape {
 	background-color: $whiteColor;
 }
@@ -316,7 +321,7 @@ canvas {
 	color: #f3f3f3;
 	font-size: 18px;
 	margin: 0;
-	user-select: none
+	user-select: none;
 }
 
 .loaderContainer{
@@ -335,7 +340,7 @@ canvas {
 	white-space: nowrap;
 	overflow: hidden;
 	max-width: 100%;
-	user-select: none
+	user-select: none;
 }
 
 .loaderText.complete {

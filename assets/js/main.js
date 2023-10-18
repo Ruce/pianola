@@ -93,14 +93,15 @@ function initialiseSeeds() {
 function initialiseRewindReceiver() {
 	const rewindReceiver = document.getElementById("rewindReceiver");
 	
-	function rewind() {
-		piano.rewind();
-		rewindReceiver.style.opacity = 0.9;
-		setTimeout(() => rewindReceiver.style.opacity = 0, 350);
+	function rewindAnimated() {
+		const rewindSuccess = piano.rewind();
+		if (rewindSuccess) {
+			rewindReceiver.style.opacity = 0.9;
+			setTimeout(() => rewindReceiver.style.opacity = 0, 350);
+		}
 	}
-	rewindReceiver.addEventListener('dblclick', () => rewind());
+	rewindReceiver.addEventListener('dblclick', () => rewindAnimated());
 }
-
 
 function populateSeedList(exampleSongs) {
 	const numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
@@ -130,6 +131,12 @@ function toggleMute() {
 		volumeSlider.value = 0;
 		piano.changeVolume(0);
 		document.getElementById('menuMuteTooltip').textContent = 'Unmute';
+	}
+}
+
+function rewindMusic() {
+	if (typeof piano !== 'undefined') {
+		piano.rewind();
 	}
 }
 
