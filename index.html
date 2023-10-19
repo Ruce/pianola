@@ -29,19 +29,38 @@ layout: default
 		</button>
 		<button class="menuButton" onclick="stopMusic()"><div class="menuButtonShape stopButtonShape"></div><div class="menuButtonTooltip">Stop (space)</div></button>
 		<button class="menuButton" onclick="rewindMusic()"><div class="menuButtonShape rewindButtonShape"></div><div class="menuButtonTooltip">Rewind (←)</div></button>
-		<button class="menuButton" onclick="openOverlay()"><div class="menuButtonShape helpButtonShape"><div class="helpButtonInner">i</div></div><div class="menuButtonTooltip">Help</div></button>
 		<button class="menuButton" onclick="toggleMute()"><div class="menuButtonShape volumeButtonShape" id="volumeButtonImage"></div><div class="menuButtonTooltip" id="menuMuteTooltip">Mute</div></button>
 		<input type="range" class="volumeSlider" id="volumeSlider" min="0" max="100" value="85">
+		<div class="verticalSeparator"></div>
+		<button class="menuButton" onclick="openOverlay()"><div class="menuButtonShape helpButtonShape"><div class="helpButtonInner">i</div></div><div class="menuButtonTooltip">Help</div></button>
 	</div>
 </div>
-<div id="overlay">
+<div id="overlay" onclick="closeOverlay()">
 	<div id="introduction">
 		<button id="closeIntroButton" onclick="closeOverlay()"></button>
 		<div id="definitionText"><h1>pianola</h1>
 		<span class="pronunciation">/pɪəˈnəʊlə/</span><br>
-		<span><i>(noun) A self-playing, self-composing piano.</i></span></div>
-		<p>Start creating music by prompting pianola with a short snippet, or choose an example piece from the Play menu</p>
-		<br>
-		<button id="introGoButton" onclick="closeOverlay()">Let's Roll!</button>
+		<span><i>(noun) A self-playing, self-composing AI piano.</i></span></div>
+		<div id="introText">
+			<p>Welcome to Pianola!</p>
+			<p>Create music by playing a short snippet or choosing an example seed from the Play menu. Sit back as the piano continues on from your prompt, or play along to influence the direction of the piece!</p>
+			<hr>
+			<div id="noteBarContainer">
+				<div class="noteBarSection">
+					<div class="noteBar noteBarPlayer noteBarWhite"></div>
+					<div class="noteBar noteBarPlayer noteBarBlack"></div>
+				</div>
+				<div class="noteBarSection">
+					<div class="noteBar noteBarBot noteBarWhite"></div>
+					<div class="noteBar noteBarBot noteBarBlack"></div>
+				</div>
+				<div class="noteBarSection">
+					<div class="noteBar noteBarModel noteBarWhite"></div>
+					<div class="noteBar noteBarModel noteBarBlack"></div>
+				</div>
+			</div>
+			<p><i><b>Tip:</b> Want a different continuation? Rewind (left double tap) and have the AI try again!</i></p>
+		</div>
+		<span id="introFooter"><i>For technical information, see the <a href="https://github.com/Ruce/pianola" target="_blank" rel="noopener noreferrer">GitHub repository</a></i></span>
 	</div>
 </div>

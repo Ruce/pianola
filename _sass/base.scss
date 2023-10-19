@@ -1,14 +1,19 @@
-$backgroundColor: #000000;
-$bodyColor: #000000;
-$lightBlueColor: #5EBBBF;
+$notesCanvasColor: #2A2A2A;
 $whiteColor: #FEFEFE;
 $menuBackgroundColor: #595959;
 $menuLightColor: #6E6E6E;
+$playerWhiteBarColor: #FDFD66;
+$playerBlackBarColor: #FFBF00;
+$modelWhiteBarColor: #BEFCFF;
+$modelBlackBarColor: #5EBBBF;
+$botWhiteBarColor: #AFFED7;
+$botBlackBarColor: #59DD9C;
+
 $bodyFont: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
 
 body {
-	background: $backgroundColor;
-	color: $bodyColor;
+	background: $notesCanvasColor;
+	color: $notesCanvasColor;
 	font-family: $bodyFont;
 }
 
@@ -26,6 +31,12 @@ canvas {
 	margin: 0;
 	padding: 0;
 	vertical-align: top;
+}
+
+hr {
+	border: none;
+	height: 1px;
+	background-color: $modelWhiteBarColor;
 }
 
 ::-webkit-scrollbar {
@@ -152,7 +163,7 @@ canvas {
 	top: 10px;
 	left: 50%;
 	transform: translateX(-50%);
-	width: 370px;
+	width: 390px;
 	height: 35px;
 	background-color: $menuBackgroundColor;
 	opacity: 0.95;
@@ -275,7 +286,7 @@ canvas {
 	height: 80%;
 	border-radius: 50%;
 	background-color: $menuBackgroundColor;
-	color: white;
+	color: $whiteColor;
 	font-family: serif;
 	font-size: 11px;
 	font-weight: bold;
@@ -293,7 +304,7 @@ canvas {
 }
 
 .volumeSlider {
-	margin: 0 0 0 -10px;
+	margin: 0 12px 0 -10px;
 	width: 75px;
 	accent-color: $whiteColor;
 	cursor: pointer;
@@ -305,6 +316,13 @@ canvas {
 
 .volumeSlider::-webkit-slider-thumb {
 	margin-top: -6px; /* Centers thumb on the track */
+}
+
+.verticalSeparator {
+	width: 1px;
+	height: 100%;
+	margin: 8px;
+	background-color: grey;
 }
 
 
@@ -319,7 +337,7 @@ canvas {
 
 .listenerText {
 	color: #f3f3f3;
-	font-size: 18px;
+	font-size: large;
 	margin: 0;
 	user-select: none;
 }
@@ -431,7 +449,7 @@ canvas {
 	left: 0;
 	width: 100%;
 	height: 100%;
-	background: rgba(0, 0, 0, 0.5);
+	background: rgba(0, 0, 0, 0.6);
 	z-index: 1;
 }
 
@@ -439,23 +457,24 @@ canvas {
 	position: absolute;
 	top: 50%;
 	left: 50%;
-	max-width: 500px;
+	max-width: 650px;
 	transform: translate(-50%, -50%);
-	background: #333333;
+	background: $notesCanvasColor;
 	color: white;
-	padding: 30px;
+	padding: 25px 35px;
 	border: 1px solid;
-	border-color: $lightBlueColor;
+	border-color: $modelBlackBarColor;
 	border-radius: 10px;
 	text-align: center;
+	font-size: 87%;
 }
 
 #definitionText {
-	color: #BEFCFF;
+	color: $modelWhiteBarColor;
 }
 
 #definitionText > h1 {
-	color: $lightBlueColor;
+	color: $modelBlackBarColor;
 	font-size: xx-large;
 	margin: 0;
 }
@@ -464,15 +483,34 @@ canvas {
 	font-size: smaller;
 }
 
+#introText {
+	text-align: left;
+}
+
+#introFooter {
+	margin: 0;
+	font-size: x-small;
+	opacity: 0.4;
+}
+
+#introFooter a:link {
+	color: $modelWhiteBarColor;
+}
+
+#introFooter a:visited {
+	color: $modelWhiteBarColor;
+}
+
 #introGoButton {
 	border: none;
-	background: $lightBlueColor;
+	background: $modelBlackBarColor;
 	color: white;
 	padding: 10px 30px;
 	border-radius: 5px;
 	cursor: pointer;
 	font-size: 16px;
 	font-weight: bold;
+	user-select: none;
 }
 
 #closeIntroButton {
@@ -508,5 +546,53 @@ canvas {
 	transform: rotate(-45deg);
 }
 
+#noteBarContainer {
+	display: flex;
+	justify-content: space-between;
+}
 
+.noteBarSection {
+	display: flex;
+	text-align: center;
+	justify-content: center;
+}
 
+.noteBar {
+	display: inline-block;
+	margin: 4px;
+	border-radius: 7px;
+}
+
+.noteBarWhite {
+	width: 48px;
+	height: 25px;
+}
+
+.noteBarBlack {
+	width: 30px;
+	height: 25px;
+}
+
+.noteBarPlayer.noteBarWhite {
+	background-color: $playerWhiteBarColor;
+}
+
+.noteBarPlayer.noteBarBlack {
+	background-color: $playerBlackBarColor;
+}
+
+.noteBarBot.noteBarWhite {
+	background-color: $botWhiteBarColor;
+}
+
+.noteBarBot.noteBarBlack {
+	background-color: $botBlackBarColor;
+}
+
+.noteBarModel.noteBarWhite {
+	background-color: $modelWhiteBarColor;
+}
+
+.noteBarModel.noteBarBlack {
+	background-color: $modelBlackBarColor;
+}

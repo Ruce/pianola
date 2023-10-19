@@ -22,7 +22,7 @@ function hideLoader() {
 }
 
 function initialisePage() {
-	NProgress.configure({ showSpinner: false });
+	NProgress.configure({ showSpinner: false, trickle: true });
 	NProgress.start();
 	
 	model = new PianolaModel(endpointBaseUrl);
@@ -41,13 +41,16 @@ function initialisePage() {
 	
 	document.addEventListener("keydown", (event) => piano.keyDown(event));
 	document.addEventListener("keyup", (event) => piano.keyUp(event));
+	
+	// 
+	document.getElementById("introduction").onclick = function(event) { event.stopPropagation(); }
 }
 
 function loadingComplete() {
 	document.getElementById('content').style.display = 'block';
 	document.getElementById('preloader').classList.add('fade-out');
 	redrawCanvases();
-	NProgress.done()
+	NProgress.done();
 }
 
 function redrawCanvases() {

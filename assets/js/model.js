@@ -3,7 +3,8 @@ class PianolaModel {
 		this.endpoint = endpoint;
 		this.lastActivity = null;
 		this.lastQuery = null;
-		this.keepAliveIntervalId = setInterval(() => this.keepAlive(), 10000);
+		this.isConnected = false;
+		this.keepAliveIntervalId = setInterval(() => this.keepAlive(), 1000);
 	}
 		
 	static queryStringToNotes(data, start, bpm) {
@@ -67,6 +68,7 @@ class PianolaModel {
 		
 		if (typeof data !== 'undefined' && !data.hasOwnProperty('message')) {
 			// Expected response received, trigger callback
+			this.isConnected = true;
 			callback();
 		} else {
 			// Wait a short while before trying to connect to model again
@@ -84,24 +86,27 @@ class PianolaModel {
 			`timesteps`: number of timesteps to generate
 		*/
 		this.lastActivity = new Date();
-		const queryString = PianolaModel.historyToQueryString(history, start, end, bpm);
-		console.log(new Date().toISOString(), 'Query:', queryString);
-		const data = await this.queryModel(queryString, timesteps, numRepeats, selectionIdx);
-		console.log(new Date().toISOString(), 'Data:', data);
-		
 		var generated = [];
-		if (!data.hasOwnProperty('message')) {
-			const offset = 15 / (bpm * 2); // Half of a 16th-note interval
-			const generatedStart = end + offset; // Generated notes start at an offset (i.e. half an interval) from the end time so that they are centered
-			generated = PianolaModel.queryStringToNotes(data, generatedStart, bpm);
+		
+		if (this.isConnected) {
+			const queryString = PianolaModel.historyToQueryString(history, start, end, bpm);
+			console.log(new Date().toISOString(), 'Query:', queryString);
+			const data = await this.queryModel(queryString, timesteps, numRepeats, selectionIdx);
+			console.log(new Date().toISOString(), 'Data:', data);
+			
+			if (!data.hasOwnProperty('message')) {
+				const offset = 15 / (bpm * 2); // Half of a 16th-note interval
+				const generatedStart = end + offset; // Generated notes start at an offset (i.e. half an interval) from the end time so that they are centered
+				generated = PianolaModel.queryStringToNotes(data, generatedStart, bpm);
+			}
 		}
-		return generated
+		return generated;
 	}
 	
 	async keepAlive() {
 		const currTime = new Date();
 		const activityTimeout = 300000;
-		const queryInterval = 30000;
+		const queryInterval = 20000;
 		// If the model has been active in `activityTimeout` window and no queries have been made in the last `queryInterval`, query the model to keep it alive
 		if (this.lastActivity !== null && currTime - this.lastActivity < activityTimeout && this.lastQuery !== null && currTime - this.lastQuery > queryInterval) {
 			const data = await this.queryModel(";", 1, 1, 0);

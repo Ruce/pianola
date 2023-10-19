@@ -62,7 +62,7 @@ class NoteBar {
 		return {
 			player: { white: '#FDFD66', black: '#FFBF00', shadow: 'yellow'},
 			model: { white: '#BEFCFF', black: '#5EBBBF', shadow: '#7DF9FF'},
-			bot: { white: '#C6FEE2', black: '#59DD9C', shadow: '#79FDBC'}
+			bot: { white: '#AFFED7', black: '#59DD9C', shadow: '#79FDBC'}
 		};
 	}
 	
@@ -150,7 +150,7 @@ class NotesCanvas {
 		this.canvas.width = this.canvas.offsetWidth;
 		this.canvas.height = this.canvas.offsetHeight;
 		
-		ctx.fillStyle = '#333333';
+		ctx.fillStyle = '#2A2A2A';
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		
 		// Check if there is anything to animate

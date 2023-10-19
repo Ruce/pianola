@@ -113,7 +113,7 @@ class Piano {
 			this.resetAll();
 		}
 		
-		if (event.key === 'ArrowLeft') {
+		if (event.key === 'ArrowLeft' || event.key === 'Backspace') {
 			this.rewind();
 		}
 		
@@ -222,6 +222,9 @@ class Piano {
 	startModel(glowDelayMs) {
 		this.modelStartTime = new Date();
 		this.callModel(); // Call model immediately, since setInterval first triggers function after the delay
+		
+		if (this.callModelIntervalId) clearInterval(this.callModelIntervalId);
+		if (this.checkActivityIntervalId) clearInterval(this.checkActivityIntervalId);
 		this.callModelIntervalId = setInterval(() => this.callModel(), this.beatsToSeconds(this.bufferBeats) * 1000);
 		this.checkActivityIntervalId = setInterval(() => this.checkActivity(), 5000);
 		this.notesCanvas.startGlow(glowDelayMs);
@@ -253,6 +256,7 @@ class Piano {
 		this.activeNotes = [];
 		this.toneStarted = false;
 		this.seedLastNoteTime = null;
+		NProgress.done();
 		
 		if (typeof this.listenerIntervalId !== 'undefined') {
 			clearInterval(this.listenerIntervalId);
@@ -263,8 +267,9 @@ class Piano {
 	seedInputListener() {
 		this.setBPM(this.defaultBPM);
 		
-		// Display the listening visual indicator
-		document.getElementById("listener").style.visibility = "visible";
+		// Start listener progress bar
+		NProgress.configure({ minimum: 0.15, trickle: false });
+		NProgress.start();
 		
 		// Start up the awaiter
 		this.awaitingInput = true;
@@ -274,6 +279,10 @@ class Piano {
 	seedInputAwaiter() {
 		const currTime = new Date();
 		const inputWaitTime = 1000; // Number of milliseconds to wait for end of player input before starting model
+		
+		// Display the listening visual indicator if model is connected
+		const listenerElement = document.getElementById("listener");
+		if (this.model.isConnected) listenerElement.style.visibility = 'visible';
 		
 		if (this.modelStartTime === null) {
 			if (currTime - this.lastActivity >= inputWaitTime && this.activeNotes.length === 0) {
@@ -286,11 +295,13 @@ class Piano {
 				this.callModelEnd = this.roundToOffset(this.seedLastNoteTime);
 				this.modelStartTime = currTime;
 				this.callModel(false);
+				NProgress.inc(0.15);
 			}
 		} else {
 			if (currTime - this.lastActivity < inputWaitTime) {
 				// Model was started but new input has been received, reset model and notes queue
 				this.stopModel();
+				NProgress.set(0.15);
 			} else if (currTime - this.lastActivity >= inputWaitTime * 3) {
 				// Rewind the transport schedule to the last of the seed input so that the history fed to the model is seamless
 				// Subtract buffer seconds since callModel() adds it to callModelEnd
@@ -301,8 +312,11 @@ class Piano {
 				
 				// Hide the listening visual indicator and stop awaiter
 				this.awaitingInput = false;
-				document.getElementById("listener").style.visibility = "hidden";
+				listenerElement.style.visibility = "hidden";
 				clearInterval(this.listenerIntervalId);
+				NProgress.done();
+			} else {
+				NProgress.inc(0.015);
 			}
 		}
 	}
@@ -339,6 +353,8 @@ class Piano {
 		const secondsToReplay = 3; // Number of seconds of history to replay before generating new notes; also acts as buffer
 		const replayTimesteps = Math.ceil(4 * secondsToReplay * this.bpm / 60); // Number of timesteps (16th-notes) to replay, based on ideal `secondsToReplay`
 		const replaySeconds = this.beatsToSeconds(replayTimesteps / 4);
+		
+		console.log(`Rewinding ${secondsToRewind} seconds...`);
 		
 		// Rewind the transport but no further back than the last seed note
 		const newTransportSeconds = this.roundToOffset(Math.max(Tone.Transport.seconds - secondsToRewind, this.seedLastNoteTime - replaySeconds));
@@ -578,11 +594,13 @@ class PianoCanvas {
 	}
 	
 	mouseOutKeyboard(event) {
-		if (globalMouseDown && this.hoverKey !== null) this.piano.releaseNote(this.hoverKey);
+		if (globalMouseDown && this.hoverKey !== null) {
+			this.piano.releaseNote(this.hoverKey);
+			this.piano.lastActivity = new Date();
+		}
 		this.hoverKey = null;
 		this.prevHoverKey = null;
 		this.triggerDraw();
-		this.piano.lastActivity = new Date();
 	}
 	
 	touchChangeKeyboard(event) {
