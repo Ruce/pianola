@@ -457,7 +457,7 @@ hr {
 	position: absolute;
 	top: 50%;
 	left: 50%;
-	max-width: 650px;
+	max-width: 640px;
 	transform: translate(-50%, -50%);
 	background: $notesCanvasColor;
 	color: white;
@@ -552,7 +552,9 @@ hr {
 }
 
 .noteBarSection {
-	display: flex;
+	width: 30%;
+	margin: 0 1%;
+	display: block;
 	text-align: center;
 	justify-content: center;
 }
@@ -561,6 +563,11 @@ hr {
 	display: inline-block;
 	margin: 4px;
 	border-radius: 7px;
+}
+
+.noteBarSection h4{
+	display: block;
+	margin: 12px 0;
 }
 
 .noteBarWhite {
