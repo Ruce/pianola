@@ -163,6 +163,16 @@ function pauseFramesCheck() {
 	}
 }
 
+function toggleHistoryDrawer() {
+	document.getElementById('historyDrawer').classList.toggle('open');
+	document.getElementById('drawerToggleShape').classList.toggle('open');
+}
+
+function closeHistoryDrawer() {
+	document.getElementById('historyDrawer').classList.remove('open');
+	document.getElementById('drawerToggleShape').classList.remove('open');
+}
+
 document.addEventListener("DOMContentLoaded", initialisePage);
 document.addEventListener("visibilitychange", pauseFramesCheck);
 document.addEventListener("mouseup", () => globalMouseDown = false);

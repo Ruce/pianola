@@ -9,6 +9,21 @@ class Note {
 		this.isRewind = isRewind;
 	}
 	
+	getPosition(bpm) {
+		const beats = this.time * bpm / 60000;
+		return `0:${beats}`
+	}
+}
+
+class History {
+	constructor(bpm, name) {
+		this.bpm = bpm;
+		this.name = name;
+		this.start = new Date();
+		this.numRewinds = 0;
+		this.noteHistory = [];
+	}
+	
 	static getRecentHistory(history, startTime) {
 		// Returns events in history that happened on or after `startTime`
 		// `history` must be an ordered list of events from first to most recent
@@ -36,9 +51,16 @@ class Note {
 		return [];
 	}
 	
-	getPosition(bpm) {
-		const beats = this.time * bpm / 60000;
-		return `0:${beats}`
+	add(note) {
+		// Ensure that note is added in chronological order within noteHistory
+		let i = this.noteHistory.length - 1;
+		while (i >= 0) {
+			if (this.noteHistory[i].time <= note.time) {
+				break;
+			}
+			i--;
+		}
+		this.noteHistory.splice(i+1, 0, note);
 	}
 }
 
