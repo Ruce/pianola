@@ -16,6 +16,8 @@ In addition to the notes to play, the model also predicts the *duration* (length
 
 The model is made up of three modules: an embedder, a transformer, and a decoder. These modules borrow from well-known architectures such as Inception networks, LLaMA transformers, and multi-label classifier chains, but are adapted to work with musical data and combined in a novel approach.
 
+![Model diagram](/assets/img/model-diagram.png)
+
 ### Embedder
 
 The embedder converts each input timestep of shape `(num_notes, num_features)` into an embedding vector that can be fed into the transformer. However, unlike text embeddings which map one-hot vectors to another dimensional space, we provide an inductive bias by applying convolutional and pooling layers on the input. We do this for a number of reasons:
