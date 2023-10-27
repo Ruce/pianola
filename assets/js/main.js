@@ -3,7 +3,13 @@
 {% include_relative actor.js %}
 {% include_relative model.js %}
 {% include_relative piano.js %}
-{% include_relative notes.js %}
+{% include_relative pianoAudio.js %}
+{% include_relative pianoCanvas.js %}
+{% include_relative pianoKey.js %}
+{% include_relative pianoRoll.js %}
+{% include_relative history.js %}
+{% include_relative note.js %}
+{% include_relative notesCanvas.js %}
 
 
 const octaves = 5;
@@ -65,12 +71,12 @@ var previousVolume = 0;
 function initialiseVolumeSlider() {
 	const slider = document.getElementById('volumeSlider');
 	previousVolume = Math.round(slider.value);
-	piano.changeVolume(previousVolume);
+	piano.pianoAudio.changeVolume(previousVolume);
 	
 	slider.addEventListener("input", (event) => {
 		const newVolume = Math.round(event.target.value);
 		previousVolume = newVolume;
-		piano.changeVolume(newVolume);
+		piano.pianoAudio.changeVolume(newVolume);
 		
 		// Change the speaker icon to on or off if necessary
 		const volumeButtonImage = document.getElementById('volumeButtonImage');
@@ -127,12 +133,12 @@ function toggleMute() {
 		const newVolume = (previousVolume === 0) ? 15 : previousVolume;
 		previousVolume = newVolume;
 		volumeSlider.value = newVolume;
-		piano.changeVolume(newVolume);
+		piano.pianoAudio.changeVolume(newVolume);
 		document.getElementById('menuMuteTooltip').textContent = 'Mute';
 	} else {
 		volumeButtonImage.classList.add('volumeButtonOff');
 		volumeSlider.value = 0;
-		piano.changeVolume(0);
+		piano.pianoAudio.changeVolume(0);
 		document.getElementById('menuMuteTooltip').textContent = 'Unmute';
 	}
 }
