@@ -160,10 +160,10 @@ hr {
 
 #historyDrawer {
 	position: absolute;
-	width: 280px;
+	width: 360px;
 	height: 100%;
 	top: 0;
-	right: -281px; /* Shift 1 extra pixel from element width because of border */
+	right: -361px; /* Shift 1 extra pixel from element width because of border */
 	background-color: $menuBackgroundColor;
 	opacity: 0.95;
 	border-width: 0 0 0 1px; /* Only left border */
@@ -229,19 +229,39 @@ hr {
 }
 
 #historyDrawerContent > ol > li {
-	font-size: small;
-	padding: 27px;
+	padding: 8px 12px;
 	text-align: left;
 	text-decoration: none;
 	white-space: nowrap;
 	overflow: hidden;
 	background-color: $menuLightColor;
-	border: grey 1px solid;
 	cursor: pointer;
 }
 
 #historyDrawerContent > ol > li:hover {
 	background-color: $menuBackgroundColor;
+}
+
+.historyTextContainer {
+	display: inline-block;
+	padding: 0 12px;
+}
+
+.historyTitle {
+	display: block;
+	font-size: medium;
+	font-weight: bold;
+}
+
+.historyDescription {
+	display: block;
+	font-size: small;
+	color: #DDD;
+}
+
+.pianoRoll {
+	position: relative;
+	padding: 0;
 }
 
 .menuContainer {
