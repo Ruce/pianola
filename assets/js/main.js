@@ -118,8 +118,9 @@ function populateSeedList(exampleSongs) {
 	for (let i = 0; i < exampleSongs.songs.length; i++) {
 		const seed = exampleSongs.songs[i];
 		const seedElement = document.createElement('li');
-		seedElement.textContent = `Seed ${numerals[i]}: ${seed.name}`;
-		seedElement.addEventListener('click', () => piano.playExample(seed.data, seed.bpm));
+		const seedTitle = `Seed ${numerals[i]}: ${seed.name}`;
+		seedElement.textContent = seedTitle;
+		seedElement.addEventListener('click', () => piano.playExample(seed.data, seed.bpm, seedTitle));
 		listContainer.appendChild(seedElement);
 	}
 }
