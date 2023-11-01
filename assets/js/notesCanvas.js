@@ -1,47 +1,3 @@
-class Note {
-	constructor(pianoKey, velocity, duration, time, actor, scheduleId, isRewind=false) {
-		this.key = pianoKey;
-		this.velocity = velocity;
-		this.duration = duration;
-		this.time = time;
-		this.actor = actor;
-		this.scheduleId = scheduleId;
-		this.isRewind = isRewind;
-	}
-	
-	static getRecentHistory(history, startTime) {
-		// Returns events in history that happened on or after `startTime`
-		// `history` must be an ordered list of events from first to most recent
-		const recentHistory = [];
-		for (let i = history.length - 1; i >= 0; i--) {
-			const h = history[i];
-			if (h.time >= startTime) {
-				recentHistory.unshift(h);
-			} else {
-				break;
-			}
-		}
-		return recentHistory;
-	}
-	
-	static removeHistory(history, startTime) {
-		// Remove events in history that happened on or after `startTime`
-		// `history` must be an ordered list of events from first to most recent
-		// Returns new history array without altering original `history`
-		for (let i = history.length - 1; i >= 0; i--) {
-			if (history[i].time < startTime) {
-				return history.slice(0, i+1);
-			}
-		}
-		return [];
-	}
-	
-	getPosition(bpm) {
-		const beats = this.time * bpm / 60000;
-		return `0:${beats}`
-	}
-}
-
 class NoteBar {
 	constructor(pianoKey, startTime, duration, bpm, relativeX, actor, isRewind) {
 		this.keyNum = pianoKey.keyNum;
@@ -201,7 +157,7 @@ class NotesCanvas {
 		const newActiveBars = [];
 		const currTime = new Date();
 		const noteSpeedFactor = 6;
-		const noteLongevity = (noteSpeedFactor / (this.piano.bpm / 60)) * 1000; // Number of milliseconds that a note lives on screen (i.e. scrolls from bottom to top)
+		const noteLongevity = (noteSpeedFactor / (this.piano.pianoAudio.bpm / 60)) * 1000; // Number of milliseconds that a note lives on screen (i.e. scrolls from bottom to top)
 		if (this.enableShadows) ctx.shadowBlur = 6;
 		for (const n of this.activeBars) {
 			const yDelta = (currTime - n.lastUpdateTime) / noteLongevity;

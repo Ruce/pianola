@@ -12,8 +12,16 @@ layout: default
 <div id="content">
 	<div id="canvasContainer">
 		<div id="notesDiv">
-			<canvas id="notesCanvas"></canvas>
+			<canvas id="notesCanvas" onclick="closeHistoryDrawer()"></canvas>
 			<div id="rewindReceiver"><div class="rewindIcon"></div></div>
+			<div id="historyDrawer">
+				<button id="historyDrawerToggle" onclick="toggleHistoryDrawer()"><div id="drawerToggleShape"></div></button>
+				<div id="historyDrawerContent">
+					<h4>History</h4>
+					<ol id="historyDrawerList">
+					</ol>
+				</div>
+			</div>
 		</div>
 		<div id="pianoDiv"><canvas id="pianoCanvas"></canvas></div>
 	</div>

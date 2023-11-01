@@ -1,7 +1,7 @@
 class Actor {
-	static Player = new Actor('Player');
-	static Bot = new Actor('Bot');
-	static Model = new Actor('Model');
+	static Player = new Actor('player');
+	static Bot = new Actor('bot');
+	static Model = new Actor('model');
 	
 	constructor(name) {
 		this.name = name;
