@@ -118,7 +118,8 @@ class Piano {
 	}
 	
 	releaseAllNotes() {
-		for (const note of this.activeNotes) {
+		const activeNotes = [...this.activeNotes];
+		for (const note of activeNotes) {
 			this.releaseNote(note.key);
 		}
 	}
@@ -217,7 +218,7 @@ class Piano {
 	
 	seedInputListener() {
 		this.pianoAudio.setBPM(this.defaultBPM);
-		this.currHistory = new History(this.pianoAudio.bpm, "Player Seed");
+		this.currHistory = new History(this.pianoAudio.bpm, "Player Prompt");
 		
 		// Start listener progress bar
 		NProgress.configure({ minimum: 0.15, trickle: false });
@@ -293,7 +294,7 @@ class Piano {
 	rewind() {
 		if (!this.pianoAudio.toneStarted || this.awaitingInput) return false;
 		
-		// Copy queued notes before they are cleared; queue is needed for replaying notes when rewinding to the beginning
+		// Copy queued notes before they are cleared; queue may be needed for replaying notes when rewinding
 		const queuedNotes = [...this.noteQueue];
 		
 		this.addToHistoryList(this.currHistory);
@@ -311,10 +312,13 @@ class Piano {
 		Tone.Transport.seconds = newTransportSeconds;
 		this.callModelEnd = newTransportSeconds + replaySeconds;
 		
+		// When "rewinding" to a future point in time, i.e. last seed note, queued notes prior to new point need to be commited to history
+		for (const note of queuedNotes) {
+			if (note.time <= this.callModelEnd) this.currHistory.add(note);
+		}
+		
 		// Get future notes within replay window
-		// With multiple rewinds near the start, queued seed notes may not have been written to history yet, so concat them to find replayNotes
-		const historyAndQueue = this.currHistory.noteHistory.concat(queuedNotes);
-		const replayNotes = History.removeHistory(History.getRecentHistory(historyAndQueue, newTransportSeconds), this.callModelEnd);
+		const replayNotes = History.removeHistory(History.getRecentHistory(this.currHistory.noteHistory, newTransportSeconds), this.callModelEnd);
 		this.currHistory.noteHistory = History.removeHistory(this.currHistory.noteHistory, newTransportSeconds);
 		
 		for (const note of replayNotes) {
@@ -355,13 +359,33 @@ class Piano {
 		const textElement = document.createElement('div');
 		historyElement.appendChild(pianoRoll.canvas);
 		historyElement.appendChild(textElement);
-		
-		textElement.classList.add('historyTextContainer');
-		textElement.innerHTML = `<span class="historyTitle">${history.name}</span>`;
-		const dateOptions = {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'};
-		if (history.start !== null) textElement.innerHTML += `<span class="historyDescription">${history.start.toLocaleString('en-US', dateOptions)}</span>`;
 		historyElement.addEventListener('click', () => this.replayHistory(historyIdx));
 		listContainer.appendChild(historyElement);
+		
+		// Get the total length of this piece and format to string
+		const historyLength = history.noteHistory.at(-1).time + history.noteHistory.at(-1).duration - history.noteHistory[0].time;
+		const historySeconds = Math.ceil(historyLength % 60);
+		const historyMinutes = Math.floor(historyLength / 60);
+		const historyLengthStr = `${historyMinutes}:${historySeconds.toString().padStart(2, '0')}`;
+		
+		const dateOptions = {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'};
+		textElement.classList.add('historyTextContainer');
+		textElement.innerHTML = `<span class="historyTitle">${this.allHistories.length}. ${history.name}</span>`;
+		textElement.innerHTML += `<span class="historyDescription">${history.start.toLocaleString('en-US', dateOptions)}</span>`;
+		textElement.innerHTML += `<span class="historyDescription">${historyLengthStr}</span>`;
+		
+		// Check if this history is a variant of another
+		let parent = history.parentHistory;
+		while (parent !== null) {
+			if (this.allHistories.indexOf(parent) !== -1) {
+				break;
+			} else {
+				parent = parent.parentHistory;
+			}
+		}
+		if (parent !== null) {
+			textElement.innerHTML += `<span class="historyDescription">Variant of History ${this.allHistories.indexOf(parent) + 1}</span>`;;
+		}
 		
 		pianoRoll.draw(history);
 	}
@@ -370,6 +394,8 @@ class Piano {
 		this.resetAll();
 		const history = this.allHistories[idx];
 		this.currHistory = new History(history.bpm, history.name);
+		this.currHistory.lastSeedNoteTime = history.noteHistory.at(-1).time;
+		this.currHistory.parentHistory = history;
 		this.pianoAudio.setBPM(history.bpm);
 		this.pianoAudio.startTone();
 		

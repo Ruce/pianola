@@ -5,7 +5,7 @@ class History {
 		this.start = new Date();
 		this.noteHistory = [];
 		this.lastSeedNoteTime = 0;
-		this.numRewinds = 0;
+		this.parentHistory = null;
 		this.isNew = false; // Tracks whether any new (non-rewind) notes have been played
 	}
 	
@@ -54,6 +54,7 @@ class History {
 		// Deep copy this History with new copies of Notes that have isRewind = true
 		const newHistory = new History(this.bpm, this.name);
 		newHistory.lastSeedNoteTime = this.lastSeedNoteTime;
+		newHistory.parentHistory = this;
 		for (const note of this.noteHistory) {
 			newHistory.add(new Note(note.key, note.velocity, note.duration, note.time, note.actor, null, true));
 		}

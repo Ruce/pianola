@@ -21,17 +21,25 @@ class PianoRoll {
 		this.canvas.width = this.canvas.offsetWidth;
 		this.canvas.height = this.canvas.offsetHeight;
 		
+		const noteWidth = 4; // Base width of a note including padding: e.g. whiteKeyWidth = noteWidth - 1, blackKeyWidth = noteWidth - 2
+		const noteHeight = 15; // Base height for 1 second, including padding
 		const padding = 6;
 		ctx.fillStyle = "#2A2A2A";
 		ctx.beginPath();
 		ctx.roundRect(0, 0, this.canvas.width, this.canvas.height, padding);
 		ctx.fill();
 		
+		// Get the most recent range of notes to be drawn
+		const histEndY = (history.noteHistory.at(-1).time + history.noteHistory.at(-1).duration) * noteHeight;
+		const histStartY = Math.max(histEndY - this.canvas.height + padding, -padding);
+		
 		for (const note of history.noteHistory) {
-			const x = note.key.isWhiteKey? padding + note.key.colourKeyNum * 4 : padding + ((note.key.octave * 28) - 20) + PianoRoll.blackKeyX[(note.key.colourKeyNum - 1) % 5];
-			const y = padding + note.time * 15;
-			const width = note.key.isWhiteKey? 3 : 2;
-			const height = note.duration * 12;
+			const x = note.key.isWhiteKey? padding + note.key.colourKeyNum * noteWidth : padding + ((note.key.octave * noteWidth * 7) - (noteWidth * 5)) + PianoRoll.blackKeyX[(note.key.colourKeyNum - 1) % 5];
+			const y = note.time * noteHeight - histStartY;
+			const width = note.key.isWhiteKey? noteWidth - 1 : noteWidth - 2;
+			const height = note.duration * (noteHeight - 3);
+			
+			if (y + height < 0) continue; // Skip notes that are off canvas
 			ctx.fillStyle = note.key.isWhiteKey ? NoteBar.fill[note.actor.name].white : NoteBar.fill[note.actor.name].black;
 			ctx.fillRect(x, y, width, height);
 		}

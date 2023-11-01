@@ -165,11 +165,12 @@ hr {
 	top: 0;
 	right: -401px; /* Shift 1 extra pixel from element width because of border */
 	background-color: $menuBackgroundColor;
+	opacity: 0.95;
 	border-width: 0 0 0 1px; /* Only left border */
 	border-color: grey;
 	border-style: solid;
 	transition: 0.4s;
-	z-index: 999;
+	z-index: 9;
 }
 
 #historyDrawer.open {
@@ -257,9 +258,8 @@ hr {
 	display: block;
 	font-size: 14px;
 	font-weight: bold;
-	white-space: nowrap;
 	overflow: hidden;
-	text-overflow: ellipsis;
+	white-space: normal;
 }
 
 .historyDescription {
@@ -560,7 +560,7 @@ hr {
 	width: 100%;
 	height: 100%;
 	background: rgba(0, 0, 0, 0.6);
-	z-index: 1;
+	z-index: 99;
 }
 
 #introduction {
