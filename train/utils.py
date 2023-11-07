@@ -16,7 +16,7 @@ class MidiDataset(Dataset):
     '''
     `tensors`: list of tensors where each tensor is a song of shape (timesteps, notes, features)
     `transpositions`: list of integers for the number of notes to transpose the corresponding tensor in `tensors`
-    `low_note`: the index of the base lowest note (i.e. before tranposing), relative to the notes dimension in `tensors`
+    `low_note`: the index of the base lowest note (i.e. before transposing), relative to the notes dimension in `tensors`
     `num_notes`: the number of notes to include in the data, starting at `low_note`
     `source_size`: number of timesteps for the source sequence
     `sample_delta`: number of timesteps between each sample, i.e. overlapping samples if < source_size, gaps between samples if > source_size
@@ -59,25 +59,27 @@ class MidiDataset(Dataset):
       curr_sample_id += n
       if curr_sample_id > idx:
         # This tensor contains the item we want
+        # Which window in this sample contains the item we want?
+        window_idx = idx - (curr_sample_id - n)
+        start = window_idx * self.sample_delta
+        end = start + self.source_size
+        
+        # Get the required window within the tensor
         if self.sparse_tensors:
-          tensor = F.pad(self.tensors[i].to_dense(), self.padding)
+          tensor_window = self.tensors[i].index_select(0, torch.arange(start, end+1)).to_dense()
+          tensor = F.pad(tensor_window, self.padding)
         else:
-          tensor = self.padded_tensors[i]
+          tensor = self.padded_tensors[i][start:end+1]
 
         # Transpose and shift notes
         transpose = self.transpositions[i]
         low = self.low_note + transpose + note_shift + self.max_shift
         high = low + self.num_notes
 
-        # Which window in this sample contains the item we want?
-        window_idx = idx - (curr_sample_id - n)
-        start = window_idx * self.sample_delta
-        end = start + self.source_size
-
-        x = tensor[start:end, low:high]
+        x = tensor[:-1, low:high]
         if len(x.shape) == 2:
           x = x.unsqueeze(dim=-1) # Add a channel dimension
-        y = tensor[start+1:end+1, low:high]
+        y = tensor[1:, low:high]
         return x, y
 
 class MidiUtil():
