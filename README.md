@@ -72,4 +72,6 @@ Furthermore, research into extending sequence lengths of Transformer models and 
 
 The source code for this project is publicly visible for the purposes of academic research and knowledge sharing. All rights are retained by the creator(s) unless permissions have been explicitly granted.
 
+Site icon modified from [Freepik - Flaticon](https://www.flaticon.com/free-icons/treble-clef).
+
 Get in touch on outlook.com at the address `bruce <dot> ckc`.
