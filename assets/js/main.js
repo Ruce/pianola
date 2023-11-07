@@ -180,6 +180,12 @@ function closeHistoryDrawer() {
 	document.getElementById('drawerToggleShape').classList.remove('open');
 }
 
+function toggleHeartIcon(event) {
+	event.stopPropagation();
+	event.target.classList.toggle('fa-regular');
+	event.target.classList.toggle('fa-solid');
+}
+
 document.addEventListener("DOMContentLoaded", initialisePage);
 document.addEventListener("visibilitychange", pauseFramesCheck);
 document.addEventListener("mouseup", () => globalMouseDown = false);

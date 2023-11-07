@@ -357,8 +357,10 @@ class Piano {
 		const historyElement = document.createElement('li');
 		const pianoRoll = new PianoRoll();
 		const textElement = document.createElement('div');
+		const heartIcon = document.createElement('i');
 		historyElement.appendChild(pianoRoll.canvas);
 		historyElement.appendChild(textElement);
+		historyElement.appendChild(heartIcon);
 		historyElement.addEventListener('click', () => this.replayHistory(historyIdx));
 		listContainer.appendChild(historyElement);
 		
@@ -373,6 +375,11 @@ class Piano {
 		textElement.innerHTML = `<span class="historyTitle">${this.allHistories.length}. ${history.name}</span>`;
 		textElement.innerHTML += `<span class="historyDescription">${history.start.toLocaleString('en-US', dateOptions)}</span>`;
 		textElement.innerHTML += `<span class="historyDescription">${historyLengthStr}</span>`;
+		
+		heartIcon.classList.add('heartIcon');
+		heartIcon.classList.add('fa-regular');
+		heartIcon.classList.add('fa-heart');
+		heartIcon.addEventListener('click', toggleHeartIcon);
 		
 		// Check if this history is a variant of another
 		let parent = history.parentHistory;
