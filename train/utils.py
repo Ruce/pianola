@@ -12,7 +12,7 @@ from scipy.stats import circmean, circvar
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class MidiDataset(Dataset):
-  def __init__(self, tensors, transpositions, low_note, num_notes, source_size, sample_delta=1, note_shift=0):
+  def __init__(self, tensors, transpositions, low_note, num_notes, source_size, sample_delta=1, note_shift=0, sparse_tensors=False):
     '''
     `tensors`: list of tensors where each tensor is a song of shape (timesteps, notes, features)
     `transpositions`: list of integers for the number of notes to transpose the corresponding tensor in `tensors`
@@ -24,17 +24,24 @@ class MidiDataset(Dataset):
     '''
     assert len(tensors) == len(transpositions), "Arguments `tensors` and `transpositions` must have the same length"
 
+    self.tensors = tensors
     self.transpositions = transpositions
     self.low_note = low_note
     self.num_notes = num_notes
     self.source_size = source_size
     self.sample_delta = sample_delta
     self.note_shifts = list(range(-note_shift, note_shift+1))
+    self.sparse_tensors = sparse_tensors
 
     # Calculate maximum amount that a tensor could be transposed, and pad tensors in advance by that amount
     self.max_shift = max([abs(i) for i in transpositions]) + note_shift
-    padding = (self.max_shift, self.max_shift) if len(tensors[0].shape) == 2 else (0, 0, self.max_shift, self.max_shift)
-    self.padded_tensors = [F.pad(tensor, padding) for tensor in tensors]
+    self.padding = (self.max_shift, self.max_shift) if len(tensors[0].shape) == 2 else (0, 0, self.max_shift, self.max_shift)
+    if self.sparse_tensors:
+      # Tensors will be loaded in __getitem__
+      self.padded_tensors = None
+    else:
+      # Pre-pad the tensors at initialisation of Dataset
+      self.padded_tensors = [F.pad(tensor, self.padding) for tensor in tensors]
 
     # Calculate number of samples per tensor
     self.tensor_lengths = [len(t) for t in tensors]
@@ -52,7 +59,10 @@ class MidiDataset(Dataset):
       curr_sample_id += n
       if curr_sample_id > idx:
         # This tensor contains the item we want
-        tensor = self.padded_tensors[i]
+        if self.sparse_tensors:
+          tensor = F.pad(self.tensors[i].to_dense(), self.padding)
+        else:
+          tensor = self.padded_tensors[i]
 
         # Transpose and shift notes
         transpose = self.transpositions[i]
