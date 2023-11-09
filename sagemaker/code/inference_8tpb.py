@@ -1,6 +1,5 @@
 import math
 import random
-import re
 import json
 import logging
 import sys
@@ -14,28 +13,45 @@ from torch.nn import Linear, ReLU, Module
 from transformers import LlamaConfig
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer, _make_causal_mask
 
+class InceptionConfig():
+    def __init__(self, in_channels, conv1_1, conv3_1, conv5_1, conv7_1, conv1_2, conv3_2, conv5_2, conv7_2, conv1_frommax):
+        self.in_channels = in_channels
+        self.conv1_1 = conv1_1
+        self.conv3_1 = conv3_1
+        self.conv5_1 = conv5_1
+        self.conv7_1 = conv7_1
+        self.conv1_2 = conv1_2
+        self.conv3_2 = conv3_2
+        self.conv5_2 = conv5_2
+        self.conv7_2 = conv7_2
+        self.conv1_frommax = conv1_frommax
+
 class InceptionModel(nn.Module):
-    def __init__(self, num_notes, out_dim):
+    def __init__(self, config, num_notes, out_dim):
+        assert (num_notes / 4).is_integer(), "Argument `num_notes` needs to be divisible by 4"
+
         super().__init__()
-        self.conv1_1 = nn.Conv1d(2, 2, kernel_size=1, stride=1, padding=0)
-        self.conv3_1 = nn.Conv1d(2, 10, kernel_size=3, stride=1, padding=1)
-        self.conv5_1 = nn.Conv1d(2, 6, kernel_size=5, stride=1, padding=2)
-        self.conv7_1 = nn.Conv1d(2, 4, kernel_size=7, stride=1, padding=3)
+        self.conv1_1 = nn.Conv1d(config.in_channels, config.conv1_1, kernel_size=1, stride=1, padding=0)
+        self.conv3_1 = nn.Conv1d(config.in_channels, config.conv3_1, kernel_size=3, stride=1, padding=1)
+        self.conv5_1 = nn.Conv1d(config.in_channels, config.conv5_1, kernel_size=5, stride=1, padding=2)
+        self.conv7_1 = nn.Conv1d(config.in_channels, config.conv7_1, kernel_size=7, stride=1, padding=3)
         self.maxpool_1 = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
 
         self.maxpool_1_to_2 = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
 
-        self.conv1_2 = nn.Conv1d(24, 8, kernel_size=1, stride=1, padding=0)
-        self.conv3_2 = nn.Conv1d(24, 18, kernel_size=3, stride=1, padding=1)
-        self.conv5_2 = nn.Conv1d(24, 12, kernel_size=5, stride=1, padding=2)
-        self.conv7_2 = nn.Conv1d(24, 6, kernel_size=7, stride=1, padding=3)
+        channel_2 = config.conv1_1 + config.conv3_1 + config.conv5_1 + config.conv7_1 + config.in_channels
+        self.conv1_2 = nn.Conv1d(channel_2, config.conv1_2, kernel_size=1, stride=1, padding=0)
+        self.conv3_2 = nn.Conv1d(channel_2, config.conv3_2, kernel_size=3, stride=1, padding=1)
+        self.conv5_2 = nn.Conv1d(channel_2, config.conv5_2, kernel_size=5, stride=1, padding=2)
+        self.conv7_2 = nn.Conv1d(channel_2, config.conv7_2, kernel_size=7, stride=1, padding=3)
         self.maxpool_2 = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
-        self.conv1_frommax = nn.Conv1d(24, 4, kernel_size=1, stride=1, padding=0)
+        self.conv1_frommax = nn.Conv1d(channel_2, config.conv1_frommax, kernel_size=1, stride=1, padding=0)
 
         self.avgpool = nn.AvgPool1d(kernel_size=3, stride=2, padding=1)
         self.flatten = nn.Flatten()
 
-        self.linear1 = nn.Linear(768, out_dim)
+        hidden_dim = (config.conv1_2 + config.conv3_2 + config.conv5_2 + config.conv7_2 + config.conv1_frommax) * int(num_notes / 4)
+        self.linear1 = nn.Linear(hidden_dim, out_dim)
 
     def forward(self, x):
         # Flatten the batch and timestep dimensions into first dimension, and swap the features and channels dimensions
@@ -211,10 +227,10 @@ class FeatureModule(nn.Module):
         return h
 
 class LalaE(nn.Module):
-    def __init__(self, config, num_notes, chain_emb_dim, chain_length, dropout=0.1):
+    def __init__(self, config, inception_config, num_notes, chain_emb_dim, chain_length, dropout=0.1):
         super().__init__()
         self.config = config
-        self.incep = InceptionModel(num_notes, config.hidden_size)
+        self.incep = InceptionModel(inception_config, num_notes, config.hidden_size)
         self.lalama = Lalama(config, dropout)
         self.chain = ChainClassifier(num_notes, config.hidden_size, chain_emb_dim, chain_length)
         self.velocity = FeatureModule(num_notes, config.hidden_size)
@@ -244,34 +260,14 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 NUM_NOTES = 64
 WINDOW_SIZE = 256
-BASE_52_MAPPING = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
-
-def to_base_52(number):
-    def decimal_to_custom_base(number, target_base, str_mapping):
-        custom_number = ""
-        while number > 0:
-            remainder = number % target_base
-            custom_number = str_mapping[remainder] + custom_number
-            number = number // target_base
-        return custom_number
-    return decimal_to_custom_base(number, 52, BASE_52_MAPPING)
-  
-def from_base_52(number_str):
-    def custom_base_to_decimal(number_str, source_base, str_mapping):
-        total = 0
-        for i, c in enumerate(reversed(number_str)):
-            value = str_mapping.index(c)
-            total += value * int(math.pow(source_base, i))
-        return total
-    return custom_base_to_decimal(number_str, 52, BASE_52_MAPPING)
+TICKS_DELIMITER = ';'
 
 def feature_tensor_to_str(feature_tensor):
     '''
         Converts a tensor of shape (num_timesteps, num_notes, 2) to a string. Last dimension of tensor contains features (velocity, duration)
-        Output is a delimited string, where each segment is separated by a number, and each segment is a timestep containing active notes in that step
-        Active notes are represented as 4 character long base52 strings, which when converted to base10 are 7 digit long numbers
-        Of the base10 number, the first two digits is the note number (shifted by 2), next two digits is velocity (shifted by 1), and last three digits is duration (scaled by 10)
-        E.g. 'KjJs' = 5088062: note = 50 - 2 = 48, velocity = 0.89, duration = 6.2
+        Output is a delimited string where each segment separated by `TICKS_DELIMITER` is a timestep, containing the active notes in that step
+        Active notes are represented as 6 character strings, where the first two characters is the note number, second two is velocity, and last two is duration
+        E.g. 126405: note = 12, velocity = 0.65 (see comments below about velocity), duration = 5
     '''
     notes_list = []
     for t in range(len(feature_tensor)):
@@ -283,46 +279,26 @@ def feature_tensor_to_str(feature_tensor):
             velocity = round((tensor_slice[n, 0].item() * 100) - 1)
             velocity = max(min(velocity, 99), 0)
 
-            # Scale duration up by 10 so it is a 3 digit integer ranging from 0 to 999
-            duration = round(tensor_slice[n, 1].item() * 10)
-            duration = max(min(duration, 999), 1)
+            duration = round(tensor_slice[n, 1].item())
+            duration = max(min(duration, 99), 1)
 
-            # N.B. Important: we shift the note up by 2 so that the base52 string is guaranteed to be 4 characters long
-            note_shifted = n + 2
-
-            number_str = f"{note_shifted:02d}{velocity:02d}{duration:03d}"
-            slice_note_str += to_base_52(int(number_str))
+            slice_note_str += f"{n:02d}{velocity:02d}{duration:02d}"
         notes_list.append(slice_note_str)
-    output = ''
-    spaces = 0
-    for notes_str in notes_list:
-        if notes_str == '':
-            spaces += 1
-        else:
-            # Add the number of spaces before this timestep of active notes
-            output += str(spaces) + notes_str
-            spaces = 0
-    if spaces > 0:
-        output += str(spaces)
-    return output
+    return TICKS_DELIMITER.join(notes_list)
   
 def notes_str_to_feature_tensor(notes_str, num_notes):
-    notes_slices = [x for x in re.split("\d+", notes_str) if x != '']
-    spaces = [int(x) for x in re.findall("\d+", notes_str)]
-    notes_tensor = torch.zeros((sum(spaces) + len(notes_slices), num_notes, 2), dtype=torch.float)
+    notes_slices = notes_str.split(TICKS_DELIMITER)
+    notes_tensor = torch.zeros((len(notes_slices), num_notes, 2), dtype=torch.float)
 
-    t = 0
-    for active_notes_str, space in zip(notes_slices, spaces):
-        t += space
-        active_notes = [active_notes_str[i:i+4] for i in range(0, len(active_notes_str), 4)]
-        for note_str in active_notes:
-            note_numerals = f"{from_base_52(note_str):07d}"
-            note_num = int(note_numerals[0:2]) - 2 # N.B. Important: the note was shifted up by 2 when converting to a note string
-            velocity = (int(note_numerals[2:4]) + 1) / 100
-            duration = int(note_numerals[4:7]) / 10
-            notes_tensor[t, note_num, 0] = velocity
-            notes_tensor[t, note_num, 1] = duration
-        t += 1
+    for t, active_notes_str in enumerate(notes_slices):
+        if len(active_notes_str) != 0:
+            active_notes = [active_notes_str[i:i+6] for i in range(0, len(active_notes_str), 6)]
+            for note_str in active_notes:
+                note_num = int(note_str[0:2])
+                velocity = (int(note_str[2:4]) + 1) / 100
+                duration = int(note_str[4:6])
+                notes_tensor[t, note_num, 0] = velocity
+                notes_tensor[t, note_num, 1] = duration
     return notes_tensor
 
 def generate_music(model, seed, timesteps, num_repeats=1, selection_idx=0):
@@ -353,10 +329,10 @@ def generate_music(model, seed, timesteps, num_repeats=1, selection_idx=0):
 def model_fn(model_dir):
     config = LlamaConfig(
         vocab_size=0,
-        hidden_size=192,
+        hidden_size=384,
         intermediate_size=2048,
-        num_hidden_layers=12,
-        num_attention_heads=8,
+        num_hidden_layers=16,
+        num_attention_heads=12,
         num_key_value_heads=None,
         hidden_act="silu",
         max_position_embeddings=512,
@@ -366,8 +342,13 @@ def model_fn(model_dir):
         rope_theta=10000.0,
         rope_scaling=None,
     )
+
+    inception_config = InceptionConfig(
+        in_channels = 2, conv1_1 = 4, conv3_1 = 12, conv5_1 = 10, conv7_1 = 8,
+        conv1_2 = 12, conv3_2 = 24, conv5_2 = 16, conv7_2 = 12, conv1_frommax = 8
+    )
     
-    model = LalaE(config, NUM_NOTES, chain_emb_dim=32, chain_length=12, dropout=0.0)
+    model = LalaE(config, inception_config, NUM_NOTES, chain_emb_dim=32, chain_length=12, dropout=0.0)
     with open(os.path.join(model_dir, "model.pth"), "rb") as f:
         model.load_state_dict(torch.load(f, map_location=device))
     model.to(device).eval()

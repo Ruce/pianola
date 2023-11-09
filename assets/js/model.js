@@ -6,46 +6,93 @@ class PianolaModel {
 		this.isConnected = false;
 		this.keepAliveIntervalId = setInterval(() => this.keepAlive(), 1000);
 	}
-		
+	
+	static get Base52Mapping() {
+		return ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+	}
+	
+	static toBase52(number) {
+		function decimalToCustomBase(number, targetBase, strMapping){
+			let customNumber = "";
+			while (number > 0) {
+				const remainder = number % targetBase;
+				customNumber = strMapping[remainder] + customNumber;
+				number = Math.floor(number / targetBase);
+			}
+			return customNumber;
+		}
+		return decimalToCustomBase(number, 52, PianolaModel.Base52Mapping);
+	}
+	
+	static fromBase52(numberStr) {
+		function customBaseToDecimal(numberStr, sourceBase, strMapping) {
+			let total = 0;
+			for (const [i, c] of numberStr.split('').reverse().entries()) {
+				const value = strMapping.indexOf(c);
+				total += parseInt(value * Math.pow(sourceBase, i));
+			}
+			return total;
+		}
+		return customBaseToDecimal(numberStr, 52, PianolaModel.Base52Mapping);
+	}
+	
+	static padNum(number, digits) {
+		return number.toString().padStart(digits, '0');
+	}
+	
 	static queryStringToNotes(data, start, bpm) {
 		const s = 60 / (bpm * 4); // Length of a sixteenth note in seconds
 		
+		const notesSlices = data.split(/\d+/).filter((x) => x !== '');
+		const spaces = Array.from(data.match(/\d+/g), (x) => parseInt(x));
+
 		const generated = [];
-		const timesteps = data.split(';');
-		for (let i=0; i < timesteps.length; i++) {
-			const step = timesteps[i];
-			const time = start + i*s;
-			for (let i = 0; i < step.length; i += 6) {
-				const note = step.slice(i, i + 6);
-				const noteNum = parseInt(note.slice(0, 2));
-				const velocity = (parseInt(note.slice(2, 4)) + 1) / 100;
-				const duration = parseInt(note.slice(4, 6)) * s;
-				generated.push({keyNum: noteNum, velocity: velocity, duration: duration, time: time});
+		let t = start;
+		for (let i=0; i < notesSlices.length; i++) {
+			t += spaces[i] * s;
+			const notesStr = notesSlices[i];
+			for (let i = 0; i < notesStr.length; i += 4) {
+				const noteNumerals = PianolaModel.padNum(PianolaModel.fromBase52(notesStr.slice(i, i + 4)), 7);
+				const noteNum = parseInt(noteNumerals.slice(0, 2)) - 2; // N.B. Important: the note was shifted up by 2 when converting to a note string
+				const velocity = (parseInt(noteNumerals.slice(2, 4)) + 1) / 100;
+				const duration = parseInt(noteNumerals.slice(4, 7)) * s / 10;
+				generated.push({keyNum: noteNum, velocity: velocity, duration: duration, time: t});
 			}
+			t += s;
 		}
 		return generated;
 	}
 	
 	static historyToQueryString(history, start, end, bpm) {
-		function toPaddedNumber(number) {
-			return number.toString().padStart(2, '0');
-		}
-		
 		const s = 60 / (bpm * 4); // Length of a sixteenth note in seconds
 		const numSixteenthNotes = Math.round((end - start) / s);
 		const orderedNotes = Array.from({ length: numSixteenthNotes }, () => []);
-		
+
 		for (const n of history) {
 			if (n.time < end) {
 				const t = Math.floor((n.time - start) / s); // Delta between note and startTick in SixteenthNotes
 				const velocity = Math.max(Math.min(Math.round((n.velocity * 100) - 1), 99), 0); // Velocity scaled to be 0-indexed, between 0 and 99
-				const duration = Math.max(Math.min(Math.round(n.duration / s), 99), 1);
-				const noteStr = `${toPaddedNumber(n.key.keyNum)}${toPaddedNumber(velocity)}${toPaddedNumber(duration)}`;
-				orderedNotes[t].push(noteStr);
+				const duration = Math.max(Math.min(Math.round(n.duration / s * 10), 999), 1);
+				
+				// N.B. Important: we shift the note up by 2 so that the base52 string is guaranteed to be 4 characters long
+				const noteShifted = n.key.keyNum + 2
+				const numberStr = `${PianolaModel.padNum(noteShifted, 2)}${PianolaModel.padNum(velocity, 2)}${PianolaModel.padNum(duration, 3)}`;
+				orderedNotes[t].push(PianolaModel.toBase52(numberStr));
 			}
 		}
 		
-		const queryString = orderedNotes.map(x => x.join('')).join(';');
+		let queryString = '';
+		let spaces = 0;
+		for (const notes of orderedNotes) {
+			if (notes.length === 0) {
+				spaces++;
+			} else {
+				// Add the number of spaces before this timestep of active notes
+				queryString += spaces.toString() + notes.join('');
+				spaces = 0;
+			}
+		}
+		if (spaces > 0) queryString += spaces.toString();
 		return queryString;
 	}
 	
