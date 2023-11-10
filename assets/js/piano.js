@@ -146,7 +146,7 @@ class Piano {
 		
 		const numRepeats = 3;
 		const selectionIdx = 1;
-		const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.getInterval(), this.bufferBeats * 4, numRepeats, selectionIdx);
+		const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.getInterval(), this.bufferBeats * this.ticksPerBeat, numRepeats, selectionIdx);
 		
 		// Before scheduling notes, check that the model hasn't been restarted while this function was awaiting a response
 		if (this.modelStartTime !== null && initiatedTime >= this.modelStartTime) {
@@ -239,7 +239,7 @@ class Piano {
 	
 	seedInputAwaiter() {
 		const currTime = new Date();
-		const inputWaitTime = 1000; // Number of milliseconds to wait for end of player input before starting model
+		const inputWaitTime = 1500; // Number of milliseconds to wait for end of player input before starting model
 		
 		// Display the listening visual indicator if model is connected
 		const listenerElement = document.getElementById("listener");
@@ -249,7 +249,7 @@ class Piano {
 			if (currTime - this.lastActivity >= inputWaitTime && this.activeNotes.length === 0) {
 				// Start the model:
 				// Detect tempo from user input
-				this.pianoAudio.bpm = PianoAudio.detectBpm(this.currHistory.noteHistory, 60, 110);
+				this.pianoAudio.bpm = PianoAudio.detectBpm(this.currHistory.noteHistory, 52, 100);
 				this.currHistory.bpm = this.pianoAudio.bpm;
 				
 				// To determine end time of the seed passage, round up the last note's time to an interval boundary

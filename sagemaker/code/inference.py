@@ -14,28 +14,45 @@ from torch.nn import Linear, ReLU, Module
 from transformers import LlamaConfig
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer, _make_causal_mask
 
+class InceptionConfig():
+    def __init__(self, in_channels, conv1_1, conv3_1, conv5_1, conv7_1, conv1_2, conv3_2, conv5_2, conv7_2, conv1_frommax):
+        self.in_channels = in_channels
+        self.conv1_1 = conv1_1
+        self.conv3_1 = conv3_1
+        self.conv5_1 = conv5_1
+        self.conv7_1 = conv7_1
+        self.conv1_2 = conv1_2
+        self.conv3_2 = conv3_2
+        self.conv5_2 = conv5_2
+        self.conv7_2 = conv7_2
+        self.conv1_frommax = conv1_frommax
+
 class InceptionModel(nn.Module):
-    def __init__(self, num_notes, out_dim):
+    def __init__(self, config, num_notes, out_dim):
+        assert (num_notes / 4).is_integer(), "Argument `num_notes` needs to be divisible by 4"
+
         super().__init__()
-        self.conv1_1 = nn.Conv1d(2, 2, kernel_size=1, stride=1, padding=0)
-        self.conv3_1 = nn.Conv1d(2, 10, kernel_size=3, stride=1, padding=1)
-        self.conv5_1 = nn.Conv1d(2, 6, kernel_size=5, stride=1, padding=2)
-        self.conv7_1 = nn.Conv1d(2, 4, kernel_size=7, stride=1, padding=3)
+        self.conv1_1 = nn.Conv1d(config.in_channels, config.conv1_1, kernel_size=1, stride=1, padding=0)
+        self.conv3_1 = nn.Conv1d(config.in_channels, config.conv3_1, kernel_size=3, stride=1, padding=1)
+        self.conv5_1 = nn.Conv1d(config.in_channels, config.conv5_1, kernel_size=5, stride=1, padding=2)
+        self.conv7_1 = nn.Conv1d(config.in_channels, config.conv7_1, kernel_size=7, stride=1, padding=3)
         self.maxpool_1 = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
 
         self.maxpool_1_to_2 = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
 
-        self.conv1_2 = nn.Conv1d(24, 8, kernel_size=1, stride=1, padding=0)
-        self.conv3_2 = nn.Conv1d(24, 18, kernel_size=3, stride=1, padding=1)
-        self.conv5_2 = nn.Conv1d(24, 12, kernel_size=5, stride=1, padding=2)
-        self.conv7_2 = nn.Conv1d(24, 6, kernel_size=7, stride=1, padding=3)
+        channel_2 = config.conv1_1 + config.conv3_1 + config.conv5_1 + config.conv7_1 + config.in_channels
+        self.conv1_2 = nn.Conv1d(channel_2, config.conv1_2, kernel_size=1, stride=1, padding=0)
+        self.conv3_2 = nn.Conv1d(channel_2, config.conv3_2, kernel_size=3, stride=1, padding=1)
+        self.conv5_2 = nn.Conv1d(channel_2, config.conv5_2, kernel_size=5, stride=1, padding=2)
+        self.conv7_2 = nn.Conv1d(channel_2, config.conv7_2, kernel_size=7, stride=1, padding=3)
         self.maxpool_2 = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
-        self.conv1_frommax = nn.Conv1d(24, 4, kernel_size=1, stride=1, padding=0)
+        self.conv1_frommax = nn.Conv1d(channel_2, config.conv1_frommax, kernel_size=1, stride=1, padding=0)
 
         self.avgpool = nn.AvgPool1d(kernel_size=3, stride=2, padding=1)
         self.flatten = nn.Flatten()
 
-        self.linear1 = nn.Linear(768, out_dim)
+        hidden_dim = (config.conv1_2 + config.conv3_2 + config.conv5_2 + config.conv7_2 + config.conv1_frommax) * int(num_notes / 4)
+        self.linear1 = nn.Linear(hidden_dim, out_dim)
 
     def forward(self, x):
         # Flatten the batch and timestep dimensions into first dimension, and swap the features and channels dimensions
@@ -211,10 +228,10 @@ class FeatureModule(nn.Module):
         return h
 
 class LalaE(nn.Module):
-    def __init__(self, config, num_notes, chain_emb_dim, chain_length, dropout=0.1):
+    def __init__(self, config, inception_config, num_notes, chain_emb_dim, chain_length, dropout=0.1):
         super().__init__()
         self.config = config
-        self.incep = InceptionModel(num_notes, config.hidden_size)
+        self.incep = InceptionModel(inception_config, num_notes, config.hidden_size)
         self.lalama = Lalama(config, dropout)
         self.chain = ChainClassifier(num_notes, config.hidden_size, chain_emb_dim, chain_length)
         self.velocity = FeatureModule(num_notes, config.hidden_size)
@@ -243,7 +260,7 @@ class LalaE(nn.Module):
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 NUM_NOTES = 64
-WINDOW_SIZE = 256
+WINDOW_SIZE = 384
 BASE_52_MAPPING = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
 
 def to_base_52(number):
@@ -349,14 +366,14 @@ def generate_music(model, seed, timesteps, num_repeats=1, selection_idx=0):
     sample_idx = prob_masses.argsort()[selection_idx]
     return generated[sample_idx]
 
-# defining model and loading weights to it.
+# Define model and load weights
 def model_fn(model_dir):
     config = LlamaConfig(
         vocab_size=0,
-        hidden_size=192,
+        hidden_size=384,
         intermediate_size=2048,
-        num_hidden_layers=12,
-        num_attention_heads=8,
+        num_hidden_layers=16,
+        num_attention_heads=12,
         num_key_value_heads=None,
         hidden_act="silu",
         max_position_embeddings=512,
@@ -366,15 +383,20 @@ def model_fn(model_dir):
         rope_theta=10000.0,
         rope_scaling=None,
     )
+
+    inception_config = InceptionConfig(
+        in_channels = 2, conv1_1 = 4, conv3_1 = 12, conv5_1 = 10, conv7_1 = 8,
+        conv1_2 = 12, conv3_2 = 24, conv5_2 = 16, conv7_2 = 12, conv1_frommax = 8
+    )
     
-    model = LalaE(config, NUM_NOTES, chain_emb_dim=32, chain_length=12, dropout=0.0)
+    model = LalaE(config, inception_config, NUM_NOTES, chain_emb_dim=32, chain_length=12, dropout=0.0)
     with open(os.path.join(model_dir, "model.pth"), "rb") as f:
         model.load_state_dict(torch.load(f, map_location=device))
     model.to(device).eval()
     return model
 
 
-# data preprocessing
+# Preprocess input data
 def input_fn(request_body, request_content_type):
     assert request_content_type == "application/json"
     request_json = json.loads(request_body)
@@ -386,7 +408,7 @@ def input_fn(request_body, request_content_type):
     return {'data': data, 'timesteps': timesteps, 'num_repeats': num_repeats, 'selection_idx': selection_idx}
 
 
-# inference
+# Retrieve prediction parameters from input
 def predict_fn(input_object, model):
     timesteps = int(input_object['timesteps'])
     num_repeats = int(input_object['num_repeats'])
@@ -397,7 +419,7 @@ def predict_fn(input_object, model):
     return prediction
 
 
-# postprocess
+# Return generated output as json
 def output_fn(predictions, content_type):
     assert content_type == "application/json"
     res = feature_tensor_to_str(predictions)

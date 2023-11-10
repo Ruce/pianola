@@ -13,8 +13,8 @@
 
 
 const octaves = 5;
-const ticksPerBeat = 4;
-const endpointBaseUrl = 'https://vcnf5f6zo2.execute-api.eu-west-2.amazonaws.com/beta/generate?';
+const ticksPerBeat = 8;
+const endpointBaseUrl = 'https://vcnf5f6zo2.execute-api.eu-west-2.amazonaws.com/alpha/generate?';
 
 var piano;
 var notesCanvas;
