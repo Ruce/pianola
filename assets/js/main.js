@@ -13,6 +13,7 @@
 
 
 const octaves = 5;
+const ticksPerBeat = 4;
 const endpointBaseUrl = 'https://vcnf5f6zo2.execute-api.eu-west-2.amazonaws.com/beta/generate?';
 
 var piano;
@@ -33,7 +34,7 @@ function initialisePage() {
 	
 	model = new PianolaModel(endpointBaseUrl);
 	model.connectToModel(hideLoader);
-	piano = new Piano('pianoCanvas', octaves, model);
+	piano = new Piano('pianoCanvas', octaves, ticksPerBeat, model);
 	notesCanvas = new NotesCanvas('notesCanvas', piano);
 	
 	initialiseVolumeSlider();
@@ -47,14 +48,19 @@ function initialisePage() {
 	
 	document.addEventListener("keydown", (event) => piano.keyDown(event));
 	document.addEventListener("keyup", (event) => piano.keyUp(event));
-	
-	// 
 	document.getElementById("introduction").onclick = function(event) { event.stopPropagation(); }
+
 }
 
 function loadingComplete() {
 	document.getElementById('content').style.display = 'block';
 	document.getElementById('preloader').classList.add('fade-out');
+	
+	const searchParams = new URLSearchParams(window.location.search);
+	if (searchParams.get('play') && searchParams.get('bpm')) {
+		piano.addSharedHistory(searchParams.get('play'), parseInt(searchParams.get('bpm')));
+	}
+	
 	redrawCanvases();
 	NProgress.done();
 }

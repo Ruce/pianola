@@ -1,14 +1,15 @@
 class Piano {
-	constructor(canvasId, octaves, model) {
+	constructor(canvasId, octaves, ticksPerBeat, model) {
 		if (octaves < 1 || octaves > 7) {
 			throw new RangeError("The number of octaves must be between 1 and 7");
 		}
 		this.bufferBeats = 6;
 		this.bufferTicks = Tone.Time(`0:${this.bufferBeats}`).toTicks();
-		this.historyWindowBeats = 58;
+		this.historyWindowBeats = 42;
 		this.defaultBPM = 80;
 		
 		this.octaves = octaves;
+		this.ticksPerBeat = ticksPerBeat;
 		this.pianoKeys = PianoKey.createPianoKeys(this.octaves);
 		this.keyMap = PianoKeyMap.keyMap;
 		this.pianoCanvas = new PianoCanvas(this, canvasId);
@@ -31,10 +32,15 @@ class Piano {
 		return (beats / this.pianoAudio.bpm) * 60;
 	}
 	
+	getInterval() {
+		// Returns the time (in seconds) for the smallest tick interval
+		return this.beatsToSeconds(1 / this.ticksPerBeat);
+	}
+	
 	roundToOffset(time) {
 		// Rounds up `time` to the nearest interval that is offset by half a timestep
 		// Primarily used for calculating callModelEnd time
-		const interval = this.beatsToSeconds(1/4);
+		const interval = this.beatsToSeconds(1 / this.ticksPerBeat);
 		const remainder = (time + (interval / 2)) % interval;
 		return time - remainder + interval;
 	}
@@ -131,15 +137,17 @@ class Piano {
 	
 	async callModel(scheduleImmediately=true) {
 		const initiatedTime = new Date();
-		const offset = this.beatsToSeconds(1/4) / 2; // Start the window at half of an interval (sixteenth note) earlier so that notes are centered
-		const start = Math.max(this.callModelEnd - this.beatsToSeconds(this.historyWindowBeats), -offset);
+		
+		// Start the window at an offset (i.e. half an interval) earlier so that notes are centered
+		const start = Math.max(this.callModelEnd - this.beatsToSeconds(this.historyWindowBeats), -this.getInterval() / 2);
 		const history = History.getRecentHistory(this.currHistory.noteHistory, start);
 		const queued = History.getRecentHistory(this.noteQueue, start);
 		history.push(...queued);
 		
 		const numRepeats = 3;
 		const selectionIdx = 1;
-		const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.pianoAudio.bpm, this.bufferBeats * 4, numRepeats, selectionIdx);
+		const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.getInterval(), this.bufferBeats * 4, numRepeats, selectionIdx);
+		
 		// Before scheduling notes, check that the model hasn't been restarted while this function was awaiting a response
 		if (this.modelStartTime !== null && initiatedTime >= this.modelStartTime) {
 			for (const gen of generated) {
@@ -283,7 +291,7 @@ class Piano {
 		this.currHistory = new History(this.pianoAudio.bpm, title);
 		
 		const start = Tone.Transport.seconds;
-		const notes = PianolaModel.queryStringToNotes(data, start, this.pianoAudio.bpm);
+		const notes = PianolaModel.queryStringToNotes(data, start, this.getInterval());
 		for (const note of notes) {
 			this.scheduleNote(new Note(this.pianoKeys[note.keyNum], note.velocity, note.duration, note.time, Actor.Bot));
 		}
@@ -304,8 +312,8 @@ class Piano {
 		
 		const secondsToRewind = 8;
 		const secondsToReplay = 3; // Number of seconds of history to replay before generating new notes; also acts as buffer
-		const replayTimesteps = Math.ceil(4 * secondsToReplay * this.pianoAudio.bpm / 60); // Number of timesteps (16th-notes) to replay, based on ideal `secondsToReplay`
-		const replaySeconds = this.beatsToSeconds(replayTimesteps / 4);
+		const replayTimesteps = Math.ceil(this.ticksPerBeat * secondsToReplay * this.pianoAudio.bpm / 60); // Number of timesteps to replay, based on ideal `secondsToReplay`
+		const replaySeconds = this.beatsToSeconds(replayTimesteps / this.ticksPerBeat);
 		
 		// Rewind the transport but no further back than the last seed note
 		const newTransportSeconds = this.roundToOffset(Math.max(Tone.Transport.seconds - secondsToRewind, this.currHistory.lastSeedNoteTime - replaySeconds));
@@ -412,6 +420,43 @@ class Piano {
 			this.scheduleNote(newNote);
 		}
 		this.scheduleStartModel(history.noteHistory.at(-1).time);
+	}
+	
+	addSharedHistory(sharedStr, bpm) {
+		// Split string into notes played by different actors
+		const splitNotes = sharedStr.split('_')
+		const sharedHistory = new History(bpm, "Shared Piece")
+		const interval = 60 / (this.ticksPerBeat * bpm);
+		
+		for (const [i, notesStr] of splitNotes.entries()) {
+			if (notesStr) {
+				const notes = PianolaModel.queryStringToNotes(notesStr, 0, interval);
+				for (const note of notes) {
+					sharedHistory.add(new Note(this.pianoKeys[note.keyNum], note.velocity, note.duration, note.time, Actor.Actors[i]));
+				}
+			}
+		}
+		this.addToHistoryList(sharedHistory);
+	}
+	
+	createSharedHistoryLink(history) {
+		const actorsNoteHistories = Array.from({ length: Actor.Actors.length }, () => []);
+		for (const note of history.noteHistory) {
+			const idx = Actor.Actors.indexOf(note.actor);
+			actorsNoteHistories[idx].push(note);
+		}
+		
+		const interval = 60 / (this.ticksPerBeat * history.bpm);
+		const noteStrings = [];
+		for (const noteHistory of actorsNoteHistories) {
+			if (noteHistory.length > 0) {
+				noteStrings.push(PianolaModel.historyToQueryString(noteHistory, -(interval / 2), noteHistory.at(-1).time + 0.000001, interval)); // Add a small epsilon so history period includes last note
+			} else {
+				noteStrings.push('');
+			}
+		}
+		const noteString = noteStrings.join('_');
+		return `${window.location.origin}${window.location.pathname}?${new URLSearchParams({bpm: history.bpm, play: noteString})}`;
 	}
 	
 	bindNotesCanvas(notesCanvas) {
