@@ -235,7 +235,7 @@ hr {
 	text-align: left;
 	text-decoration: none;
 	white-space: nowrap;
-	overflow: hidden;
+	overflow: visible;
 	background-color: $menuLightColor;
 	cursor: pointer;
 }
@@ -289,6 +289,82 @@ hr {
 	cursor: pointer;
 }
 
+.shareIcon {
+	position: absolute;
+	right: 14px;
+	bottom: 10px;
+	opacity: 0;
+}
+
+.shareIcon:hover::after {
+	content: "Share";
+	display: block;
+	position: absolute;
+	right: 0;
+	top: -180%;
+	padding: 5px;
+	border-radius: 5px;
+	background-color: $menuLightColor;
+	font-family: Arial;
+	font-size: 11px;
+	color: white;
+	pointer-events: none;
+	user-select: none;
+}
+
+#historyDrawerContent > ol > li:hover .shareIcon {
+	opacity: 0.2;
+}
+
+#historyDrawerContent > ol > li:hover .shareIcon:hover {
+	opacity: 1;
+	cursor: pointer;
+}
+
+.shareLinkContainer {
+	position: absolute;
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	padding: 10px;
+	z-index: 9999;
+	background-color: $notesCanvasColor;
+	color: white;
+	border: grey 1px solid;
+	border-radius: 5px;
+	font-family: Arial;
+	font-size: small;
+}
+
+.shareLinkDescription {
+	flex: 0 0 100%;
+	margin: 0 0 9px 0;
+}
+
+.shareLinkInputText {
+	flex: 1;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+input[type="text"], textarea {
+	background-color : $menuBackgroundColor;
+	color: white;
+}
+
+.copyIcon {
+	flex: 0 0 25px;
+	margin: auto;
+	font-size: 16px;
+	text-align: right;
+	opacity: 0.3;
+}
+
+.copyIcon:hover {
+	opacity: 1;
+	cursor: pointer;
+}
+
 .menuContainer {
 	position: absolute;
 	top: 10px;
@@ -326,6 +402,7 @@ hr {
 	padding: 5px;
 	border-radius: 5px;
 	background-color: $menuLightColor;
+	font-family: Arial;
 	font-size: 11px;
 	color: white;
 	pointer-events: none;
@@ -632,22 +709,16 @@ hr {
 	color: $modelWhiteBarColor;
 }
 
-#introGoButton {
-	border: none;
-	background: $modelBlackBarColor;
-	color: white;
-	padding: 10px 30px;
-	border-radius: 5px;
-	cursor: pointer;
-	font-size: 16px;
-	font-weight: bold;
-	user-select: none;
-}
-
 #closeIntroButton {
 	position: absolute;
 	top: 12px;
 	right: 12px;
+}
+
+.closeButton {
+	position: absolute;
+	top: 0;
+	right: 0;
 	width: 30px;
 	height: 30px;
 	background: none;
@@ -658,8 +729,8 @@ hr {
 	text-align: center;
 }
 
-#closeIntroButton::before,
-#closeIntroButton::after {
+.closeButton::before,
+.closeButton::after {
 	content: "";
 	position: absolute;
 	top: 7px;
@@ -669,11 +740,11 @@ hr {
 	background: white;
 }
 
-#closeIntroButton::before {
+.closeButton::before {
 	transform: rotate(45deg);
 }
 
-#closeIntroButton::after {
+.closeButton::after {
 	transform: rotate(-45deg);
 }
 

@@ -55,6 +55,7 @@ class Piano {
 	
 	keyDown(event) {
 		if (event.repeat) return;
+		if (event.altKey || event.ctrlKey || event.shiftKey) return;
 		
 		this.lastActivity = new Date();
 		if (event.key === ' ') {
@@ -366,9 +367,11 @@ class Piano {
 		const pianoRoll = new PianoRoll();
 		const textElement = document.createElement('div');
 		const heartIcon = document.createElement('i');
+		const shareIcon = document.createElement('i');
 		historyElement.appendChild(pianoRoll.canvas);
 		historyElement.appendChild(textElement);
 		historyElement.appendChild(heartIcon);
+		historyElement.appendChild(shareIcon);
 		historyElement.addEventListener('click', () => this.replayHistory(historyIdx));
 		listContainer.appendChild(historyElement);
 		
@@ -388,6 +391,11 @@ class Piano {
 		heartIcon.classList.add('fa-regular');
 		heartIcon.classList.add('fa-heart');
 		heartIcon.addEventListener('click', toggleHeartIcon);
+		
+		shareIcon.classList.add('shareIcon');
+		shareIcon.classList.add('fa-regular');
+		shareIcon.classList.add('fa-share-from-square');
+		shareIcon.addEventListener('click', (event) => this.shareHistory(event, historyIdx));
 		
 		// Check if this history is a variant of another
 		let parent = history.parentHistory;
@@ -420,6 +428,50 @@ class Piano {
 			this.scheduleNote(newNote);
 		}
 		this.scheduleStartModel(history.noteHistory.at(-1).time);
+	}
+	
+	shareHistory(event, historyIdx) {
+		event.stopPropagation();
+		const shareLink = this.createSharedHistoryLink(this.allHistories[historyIdx]);
+		
+		const linkContainer = document.createElement('div');
+		linkContainer.classList.add('shareLinkContainer');
+		
+		// Set the position of the link container based on the click event
+		const linkContainerWidth = 270;
+		linkContainer.style.width = linkContainerWidth + 'px';
+		linkContainer.style.left = (event.clientX + window.pageXOffset - linkContainerWidth) + 'px';
+		linkContainer.style.top = (event.clientY + window.pageYOffset + 14) + 'px';
+		
+		const linkDescription = document.createElement('span');
+		linkDescription.classList.add('shareLinkDescription');
+		linkDescription.textContent = 'Share your composition with this link:';
+		
+		const linkTextElement = document.createElement('input');
+		linkTextElement.classList.add('shareLinkInputText');
+		linkTextElement.type = 'text';
+		linkTextElement.value = shareLink;
+		
+		const linkCopyIcon = document.createElement('i');
+		linkCopyIcon.classList.add('copyIcon');
+		linkCopyIcon.classList.add('fa-regular');
+		linkCopyIcon.classList.add('fa-copy');
+		linkCopyIcon.addEventListener('click', () => navigator.clipboard.writeText(shareLink));
+		
+		const linkCloseButton = document.createElement('button');
+		linkCloseButton.classList.add('closeButton');
+		linkCloseButton.addEventListener('click', () => linkContainer.remove());
+		
+		linkContainer.appendChild(linkDescription);
+		linkContainer.appendChild(linkCloseButton);
+		linkContainer.appendChild(linkTextElement);
+		linkContainer.appendChild(linkCopyIcon);
+		document.body.appendChild(linkContainer);
+		
+		linkTextElement.setSelectionRange(0, linkTextElement.value.length);
+		linkTextElement.focus();
+		
+		document.addEventListener('click', (event) => console.log(event.target));
 	}
 	
 	addSharedHistory(sharedStr, bpm) {
