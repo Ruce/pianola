@@ -192,9 +192,34 @@ function toggleHeartIcon(event) {
 	event.target.classList.toggle('fa-solid');
 }
 
+function dismissShareLinkTooltip(event) {
+	function getAncestors(element) {
+		const ancestors = [];
+		let parent = element.parentNode;
+		
+		while (parent) {
+			ancestors.push(parent);
+			parent = parent.parentNode;
+		}
+		return ancestors;
+	}
+	
+	const containers = Array.from(document.getElementsByClassName('shareLinkContainer'));
+	if (containers.length === 0) return;
+	
+	// Get the ancestor elements of the event target to check if it is a share link tooltip
+	const targetAncestors = getAncestors(event.target);
+	for (const container of containers) {
+		if (event.target !== container && !targetAncestors.includes(container)) {
+			container.remove();
+		}
+	}
+}
+
 document.addEventListener("DOMContentLoaded", initialisePage);
 document.addEventListener("visibilitychange", pauseFramesCheck);
 document.addEventListener("mouseup", () => globalMouseDown = false);
+document.addEventListener("click", dismissShareLinkTooltip);
 
 var resizeTimeout = false;
 const resizeDelay = 40;

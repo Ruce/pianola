@@ -431,6 +431,7 @@ class Piano {
 	}
 	
 	shareHistory(event, historyIdx) {
+		dismissShareLinkTooltip(event);
 		event.stopPropagation();
 		const shareLink = this.createSharedHistoryLink(this.allHistories[historyIdx]);
 		
@@ -470,8 +471,6 @@ class Piano {
 		
 		linkTextElement.setSelectionRange(0, linkTextElement.value.length);
 		linkTextElement.focus();
-		
-		document.addEventListener('click', (event) => console.log(event.target));
 	}
 	
 	addSharedHistory(sharedStr, bpm) {
