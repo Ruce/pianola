@@ -15,6 +15,7 @@
 const octaves = 5;
 const ticksPerBeat = 8;
 const endpointBaseUrl = 'https://vcnf5f6zo2.execute-api.eu-west-2.amazonaws.com/alpha/generate?';
+const databaseBaseUrl = 'https://t4z5bpis3b.execute-api.eu-west-2.amazonaws.com/beta/PianolaHistoryDDB?'
 
 var piano;
 var notesCanvas;
@@ -34,14 +35,18 @@ function initialisePage() {
 	
 	model = new PianolaModel(endpointBaseUrl);
 	model.connectToModel(hideLoader);
-	piano = new Piano('pianoCanvas', octaves, ticksPerBeat, model);
+	historyController = new HistoryController(databaseBaseUrl);
+	piano = new Piano('pianoCanvas', octaves, ticksPerBeat, model, historyController);
 	notesCanvas = new NotesCanvas('notesCanvas', piano);
 	
 	initialiseVolumeSlider();
 	initialiseSeeds();
 	initialiseRewindReceiver();
 	
-	Tone.ToneAudioBuffer.loaded().then(() => {
+	const historyPromise = loadHistory();
+	const tonePromise = Tone.ToneAudioBuffer.loaded()
+	
+	Promise.all([historyPromise, tonePromise]).then(() => {
 		NProgress.set(0.8);
 		setTimeout(() => loadingComplete(), 300);
 	});
@@ -49,17 +54,11 @@ function initialisePage() {
 	document.addEventListener("keydown", (event) => piano.keyDown(event));
 	document.addEventListener("keyup", (event) => piano.keyUp(event));
 	document.getElementById("introduction").onclick = function(event) { event.stopPropagation(); }
-
 }
 
 function loadingComplete() {
 	document.getElementById('content').style.display = 'block';
 	document.getElementById('preloader').classList.add('fade-out');
-	
-	const searchParams = new URLSearchParams(window.location.search);
-	if (searchParams.get('play') && searchParams.get('bpm')) {
-		piano.addSharedHistory(searchParams.get('play'), parseInt(searchParams.get('bpm')));
-	}
 	
 	redrawCanvases();
 	NProgress.done();
@@ -71,6 +70,9 @@ function redrawCanvases() {
 	pianoDiv.style.height = pianoHeight + "px";
 	piano.pianoCanvas.triggerDraw();
 	notesCanvas.draw();
+	for (const pianoRoll of piano.historyController.allPianoRolls) {
+		pianoRoll.draw();
+	}
 }
 
 var previousVolume = 0;
@@ -116,6 +118,13 @@ function initialiseRewindReceiver() {
 		}
 	}
 	rewindReceiver.addEventListener('dblclick', () => rewindAnimated());
+}
+
+async function loadHistory() {
+	const searchParams = new URLSearchParams(window.location.search);
+	if (searchParams.get('play')) {
+		await piano.loadSharedHistory(searchParams.get('play'));
+	}
 }
 
 function populateSeedList(exampleSongs) {

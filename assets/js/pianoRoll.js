@@ -1,6 +1,7 @@
 class PianoRoll {
-	constructor() {
+	constructor(history) {
 		this.canvas = PianoRoll.createCanvasElement('164px', '92px', 'pianoRoll');
+		this.history = history;
 	}
 	
 	// Left X coordinate of each black key relative to start of an octave
@@ -16,7 +17,7 @@ class PianoRoll {
 		return canvasElement;
 	}
 	
-	draw(history) {
+	draw() {
 		const ctx = this.canvas.getContext('2d');
 		this.canvas.width = this.canvas.offsetWidth;
 		this.canvas.height = this.canvas.offsetHeight;
@@ -30,10 +31,10 @@ class PianoRoll {
 		ctx.fill();
 		
 		// Get the most recent range of notes to be drawn
-		const histEndY = (history.noteHistory.at(-1).time + history.noteHistory.at(-1).duration) * noteHeight;
+		const histEndY = (this.history.noteHistory.at(-1).time + this.history.noteHistory.at(-1).duration) * noteHeight;
 		const histStartY = Math.max(histEndY - this.canvas.height + padding, -padding);
 		
-		for (const note of history.noteHistory) {
+		for (const note of this.history.noteHistory) {
 			const x = note.key.isWhiteKey? padding + note.key.colourKeyNum * noteWidth : padding + ((note.key.octave * noteWidth * 7) - (noteWidth * 5)) + PianoRoll.blackKeyX[(note.key.colourKeyNum - 1) % 5];
 			const y = note.time * noteHeight - histStartY;
 			const width = note.key.isWhiteKey? noteWidth - 1 : noteWidth - 2;

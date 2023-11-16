@@ -1,5 +1,5 @@
 class Piano {
-	constructor(canvasId, octaves, ticksPerBeat, model) {
+	constructor(canvasId, octaves, ticksPerBeat, model, historyController) {
 		if (octaves < 1 || octaves > 7) {
 			throw new RangeError("The number of octaves must be between 1 and 7");
 		}
@@ -15,11 +15,11 @@ class Piano {
 		this.pianoCanvas = new PianoCanvas(this, canvasId);
 		this.pianoAudio = new PianoAudio(this.defaultBPM, this.pianoKeys)
 		this.model = model;
+		this.historyController = historyController;
 		
 		this.lastActivity = new Date();
 		this.modelStartTime = null;
 		this.currHistory = null;
-		this.allHistories = [];
 		this.activeNotes = [];
 		this.noteQueue = [];
 		this.noteBuffer = [];
@@ -213,7 +213,7 @@ class Piano {
 		Tone.Transport.cancel();
 		Tone.Transport.stop();
 		
-		this.addToHistoryList(this.currHistory);
+		this.historyController.addToHistoryList(this.currHistory, this);
 		this.currHistory = null;
 		this.activeNotes = [];
 		this.pianoAudio.toneStarted = false;
@@ -227,7 +227,7 @@ class Piano {
 	
 	seedInputListener() {
 		this.pianoAudio.setBPM(this.defaultBPM);
-		this.currHistory = new History(this.pianoAudio.bpm, "Player Prompt");
+		this.currHistory = new History(this.pianoAudio.bpm, "Player prompt");
 		
 		// Start listener progress bar
 		NProgress.configure({ minimum: 0.15, trickle: false });
@@ -306,7 +306,7 @@ class Piano {
 		// Copy queued notes before they are cleared; queue may be needed for replaying notes when rewinding
 		const queuedNotes = [...this.noteQueue];
 		
-		this.addToHistoryList(this.currHistory);
+		this.historyController.addToHistoryList(this.currHistory, this);
 		this.stopModel();
 		this.activeNotes = [];
 		this.currHistory = this.currHistory.copy();
@@ -357,65 +357,9 @@ class Piano {
 		return true;
 	}
 	
-	addToHistoryList(history) {
-		if (history === null || !history.isNew) return;
-		this.allHistories.push(history);
-		const historyIdx = this.allHistories.length - 1;
-		
-		const listContainer = document.getElementById('historyDrawerList');
-		const historyElement = document.createElement('li');
-		const pianoRoll = new PianoRoll();
-		const textElement = document.createElement('div');
-		const heartIcon = document.createElement('i');
-		const shareIcon = document.createElement('i');
-		historyElement.appendChild(pianoRoll.canvas);
-		historyElement.appendChild(textElement);
-		historyElement.appendChild(heartIcon);
-		historyElement.appendChild(shareIcon);
-		historyElement.addEventListener('click', () => this.replayHistory(historyIdx));
-		listContainer.appendChild(historyElement);
-		
-		// Get the total length of this piece and format to string
-		const historyLength = history.noteHistory.at(-1).time + history.noteHistory.at(-1).duration - history.noteHistory[0].time;
-		const historySeconds = Math.ceil(historyLength % 60);
-		const historyMinutes = Math.floor(historyLength / 60);
-		const historyLengthStr = `${historyMinutes}:${historySeconds.toString().padStart(2, '0')}`;
-		
-		const dateOptions = {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'};
-		textElement.classList.add('historyTextContainer');
-		textElement.innerHTML = `<span class="historyTitle">${this.allHistories.length}. ${history.name}</span>`;
-		textElement.innerHTML += `<span class="historyDescription">${history.start.toLocaleString('en-US', dateOptions)}</span>`;
-		textElement.innerHTML += `<span class="historyDescription">${historyLengthStr}</span>`;
-		
-		heartIcon.classList.add('heartIcon');
-		heartIcon.classList.add('fa-regular');
-		heartIcon.classList.add('fa-heart');
-		heartIcon.addEventListener('click', toggleHeartIcon);
-		
-		shareIcon.classList.add('shareIcon');
-		shareIcon.classList.add('fa-regular');
-		shareIcon.classList.add('fa-share-from-square');
-		shareIcon.addEventListener('click', (event) => this.shareHistory(event, historyIdx));
-		
-		// Check if this history is a variant of another
-		let parent = history.parentHistory;
-		while (parent !== null) {
-			if (this.allHistories.indexOf(parent) !== -1) {
-				break;
-			} else {
-				parent = parent.parentHistory;
-			}
-		}
-		if (parent !== null) {
-			textElement.innerHTML += `<span class="historyDescription">Variant of History ${this.allHistories.indexOf(parent) + 1}</span>`;;
-		}
-		
-		pianoRoll.draw(history);
-	}
-	
 	replayHistory(idx) {
 		this.resetAll();
-		const history = this.allHistories[idx];
+		const history = this.historyController.allHistories[idx];
 		this.currHistory = new History(history.bpm, history.name);
 		this.currHistory.lastSeedNoteTime = history.noteHistory.at(-1).time;
 		this.currHistory.parentHistory = history;
@@ -430,84 +374,8 @@ class Piano {
 		this.scheduleStartModel(history.noteHistory.at(-1).time);
 	}
 	
-	shareHistory(event, historyIdx) {
-		dismissShareLinkTooltip(event);
-		event.stopPropagation();
-		const shareLink = this.createSharedHistoryLink(this.allHistories[historyIdx]);
-		
-		const linkContainer = document.createElement('div');
-		linkContainer.classList.add('shareLinkContainer');
-		
-		// Set the position of the link container based on the click event
-		const linkContainerWidth = 270;
-		linkContainer.style.width = linkContainerWidth + 'px';
-		linkContainer.style.left = (event.clientX + window.pageXOffset - linkContainerWidth) + 'px';
-		linkContainer.style.top = (event.clientY + window.pageYOffset + 14) + 'px';
-		
-		const linkDescription = document.createElement('span');
-		linkDescription.classList.add('shareLinkDescription');
-		linkDescription.textContent = 'Share your composition with this link:';
-		
-		const linkTextElement = document.createElement('input');
-		linkTextElement.classList.add('shareLinkInputText');
-		linkTextElement.type = 'text';
-		linkTextElement.value = shareLink;
-		
-		const linkCopyIcon = document.createElement('i');
-		linkCopyIcon.classList.add('copyIcon');
-		linkCopyIcon.classList.add('fa-regular');
-		linkCopyIcon.classList.add('fa-copy');
-		linkCopyIcon.addEventListener('click', () => navigator.clipboard.writeText(shareLink));
-		
-		const linkCloseButton = document.createElement('button');
-		linkCloseButton.classList.add('closeButton');
-		linkCloseButton.addEventListener('click', () => linkContainer.remove());
-		
-		linkContainer.appendChild(linkDescription);
-		linkContainer.appendChild(linkCloseButton);
-		linkContainer.appendChild(linkTextElement);
-		linkContainer.appendChild(linkCopyIcon);
-		document.body.appendChild(linkContainer);
-		
-		linkTextElement.setSelectionRange(0, linkTextElement.value.length);
-		linkTextElement.focus();
-	}
-	
-	addSharedHistory(sharedStr, bpm) {
-		// Split string into notes played by different actors
-		const splitNotes = sharedStr.split('_')
-		const sharedHistory = new History(bpm, "Shared Piece")
-		const interval = 60 / (this.ticksPerBeat * bpm);
-		
-		for (const [i, notesStr] of splitNotes.entries()) {
-			if (notesStr) {
-				const notes = PianolaModel.queryStringToNotes(notesStr, 0, interval);
-				for (const note of notes) {
-					sharedHistory.add(new Note(this.pianoKeys[note.keyNum], note.velocity, note.duration, note.time, Actor.Actors[i]));
-				}
-			}
-		}
-		this.addToHistoryList(sharedHistory);
-	}
-	
-	createSharedHistoryLink(history) {
-		const actorsNoteHistories = Array.from({ length: Actor.Actors.length }, () => []);
-		for (const note of history.noteHistory) {
-			const idx = Actor.Actors.indexOf(note.actor);
-			actorsNoteHistories[idx].push(note);
-		}
-		
-		const interval = 60 / (this.ticksPerBeat * history.bpm);
-		const noteStrings = [];
-		for (const noteHistory of actorsNoteHistories) {
-			if (noteHistory.length > 0) {
-				noteStrings.push(PianolaModel.historyToQueryString(noteHistory, -(interval / 2), noteHistory.at(-1).time + 0.000001, interval)); // Add a small epsilon so history period includes last note
-			} else {
-				noteStrings.push('');
-			}
-		}
-		const noteString = noteStrings.join('_');
-		return `${window.location.origin}${window.location.pathname}?${new URLSearchParams({bpm: history.bpm, play: noteString})}`;
+	async loadSharedHistory(uuid) {
+		await this.historyController.getSharedHistory(uuid, this);
 	}
 	
 	bindNotesCanvas(notesCanvas) {
