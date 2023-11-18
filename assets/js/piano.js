@@ -376,14 +376,18 @@ class Piano {
 	}
 	
 	async loadSharedHistory(uuid) {
-		document.getElementById('introText').style.display = 'none';
-		document.getElementById('closeIntroButton').style.display = 'none';
-		document.getElementById('introShared').style.display = 'flex';
-		
 		this.sharedHistory = await this.historyController.getSharedHistory(uuid, this);
-		const pianoRoll = new PianoRoll(this.sharedHistory);
-		document.getElementById('introCanvasContainer').appendChild(pianoRoll.canvas);
-		pianoRoll.draw();
+		
+		if (this.sharedHistory) {
+			document.getElementById('introText').style.display = 'none';
+			document.getElementById('closeIntroButton').style.display = 'none';
+			document.getElementById('introShared').style.display = 'flex';
+			
+			
+			const pianoRoll = new PianoRoll(this.sharedHistory);
+			document.getElementById('introCanvasContainer').appendChild(pianoRoll.canvas);
+			pianoRoll.draw();
+		}
 	}
 	
 	playSharedHistory() {
