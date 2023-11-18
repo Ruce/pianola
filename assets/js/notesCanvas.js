@@ -106,7 +106,7 @@ class NotesCanvas {
 		this.canvas.width = this.canvas.offsetWidth;
 		this.canvas.height = this.canvas.offsetHeight;
 		
-		ctx.fillStyle = '#2A2A2A';
+		ctx.fillStyle = '#1D1D1D';
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		
 		// Check if there is anything to animate

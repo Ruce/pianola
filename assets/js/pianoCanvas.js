@@ -51,7 +51,7 @@ class PianoCanvas {
 	static get keyFill() {
 		return {
 			white: {inactive: '#FEFEFE', hover: '#FFF9D7', player: '#FEF3B0', model: '#D2EEEF', bot: '#CEFEDF'},
-			black: {inactive: '#595959', hover: '#D0AD40', player: '#C09200', model: '#478C8F', bot: '#2C6E4E'}
+			black: {inactive: '#4D4D4D', hover: '#D0AD40', player: '#C09200', model: '#478C8F', bot: '#2C6E4E'}
 		};
 	}
 	

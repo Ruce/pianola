@@ -1,6 +1,6 @@
 class PianoRoll {
 	constructor(history) {
-		this.canvas = PianoRoll.createCanvasElement('164px', '92px', 'pianoRoll');
+		this.canvas = PianoRoll.createCanvasElement('164px', '100px', 'pianoRoll');
 		this.history = history;
 	}
 	
@@ -23,9 +23,9 @@ class PianoRoll {
 		this.canvas.height = this.canvas.offsetHeight;
 		
 		const noteWidth = 4; // Base width of a note including padding: e.g. whiteKeyWidth = noteWidth - 1, blackKeyWidth = noteWidth - 2
-		const noteHeight = 15; // Base height for 1 second, including padding
+		const noteHeight = 10; // Base height for 1 second, including padding
 		const padding = 6;
-		ctx.fillStyle = "#2A2A2A";
+		ctx.fillStyle = "#1D1D1D";
 		ctx.beginPath();
 		ctx.roundRect(0, 0, this.canvas.width, this.canvas.height, padding);
 		ctx.fill();

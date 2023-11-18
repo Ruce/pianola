@@ -20,6 +20,7 @@ class Piano {
 		this.lastActivity = new Date();
 		this.modelStartTime = null;
 		this.currHistory = null;
+		this.sharedHistory = null;
 		this.activeNotes = [];
 		this.noteQueue = [];
 		this.noteBuffer = [];
@@ -375,7 +376,24 @@ class Piano {
 	}
 	
 	async loadSharedHistory(uuid) {
-		await this.historyController.getSharedHistory(uuid, this);
+		document.getElementById('introText').style.display = 'none';
+		document.getElementById('closeIntroButton').style.display = 'none';
+		document.getElementById('introShared').style.display = 'flex';
+		
+		this.sharedHistory = await this.historyController.getSharedHistory(uuid, this);
+		const pianoRoll = new PianoRoll(this.sharedHistory);
+		document.getElementById('introCanvasContainer').appendChild(pianoRoll.canvas);
+		pianoRoll.draw();
+	}
+	
+	playSharedHistory() {
+		if (this.sharedHistory) {
+			const historyIdx = this.historyController.allHistories.indexOf(this.sharedHistory);
+			if (historyIdx !== -1) {
+				this.replayHistory(historyIdx);
+			}
+		}
+		this.sharedHistory = null;
 	}
 	
 	bindNotesCanvas(notesCanvas) {

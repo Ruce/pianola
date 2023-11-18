@@ -173,10 +173,21 @@ function stopMusic() {
 
 function openOverlay() {
     document.getElementById('overlay').style.display = 'block';
+	document.getElementById('introText').style.display = 'block';
+	document.getElementById('closeIntroButton').style.display = 'block';
+	document.getElementById('introShared').style.display = 'none';
 }
 
 function closeOverlay() {
-    document.getElementById('overlay').style.display = 'none';
+    // Close the overlay if there isn't a shared history waiting to be played
+	if (!piano.sharedHistory) {
+		document.getElementById('overlay').style.display = 'none';
+	}
+}
+
+function playShared() {
+	piano.playSharedHistory();
+	closeOverlay();
 }
 
 function pauseFramesCheck() {
