@@ -313,7 +313,7 @@ class Piano {
 		this.currHistory = this.currHistory.copy();
 		
 		const secondsToRewind = 8;
-		const secondsToReplay = 3; // Number of seconds of history to replay before generating new notes; also acts as buffer
+		const secondsToReplay = 4; // Number of seconds of history to replay before generating new notes; also acts as buffer
 		const replayTimesteps = Math.ceil(this.ticksPerBeat * secondsToReplay * this.pianoAudio.bpm / 60); // Number of timesteps to replay, based on ideal `secondsToReplay`
 		const replaySeconds = this.beatsToSeconds(replayTimesteps / this.ticksPerBeat);
 		
@@ -351,7 +351,7 @@ class Piano {
 		}
 		
 		// Wait a short delay before calling model in case user rewinds multiple times
-		const startModelDelayMs = 800;
+		const startModelDelayMs = 1000;
 		if (this.startModelScheduleId) clearTimeout(this.startModelScheduleId);
 		this.startModelScheduleId = setTimeout(() => this.startModel(replaySeconds * 1000 - startModelDelayMs), startModelDelayMs);
 		

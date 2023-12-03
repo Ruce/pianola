@@ -108,12 +108,27 @@ class PianolaModel {
 		return queryString;
 	}
 	
+	static fetchWithRetry(url, maxRetries, delayMs, retryCount=0) {
+		return fetch(url)
+		.then(response => { return response.json(); })
+		.catch(error => {
+			if (retryCount < maxRetries) {
+				return new Promise(resolve => {
+					setTimeout(() => { resolve(PianolaModel.fetchWithRetry(url, maxRetries, delayMs, retryCount + 1)); }, delayMs);
+				});
+			} else {
+				throw error;
+			}
+		});
+	}
+	
 	async queryModel(queryString, timesteps, numRepeats, selectionIdx) {
 		this.lastQuery = new Date();
 		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString, timesteps: timesteps, num_repeats: numRepeats, selection_idx: selectionIdx});
+		const maxRetries = 20;
+		const delayMs = 100;
 		try {
-			const response = await fetch(endpointURI);
-			const data = await response.json();
+			const data = await PianolaModel.fetchWithRetry(endpointURI, maxRetries, delayMs);
 			return data;
 		} catch (error) {
 			console.log('Error connecting to endpoint:', error);
@@ -122,7 +137,7 @@ class PianolaModel {
 	
 	async connectToModel(callback) {
 		this.lastActivity = new Date();
-		const data = await this.queryModel(";", 1, 1, 0);
+		const data = await this.queryModel("1", 1, 1, 0);
 		console.log(new Date().toISOString(), `Connected to model [${data}]`);
 		
 		if (typeof data !== 'undefined' && !data.hasOwnProperty('message')) {
@@ -170,7 +185,7 @@ class PianolaModel {
 		const queryInterval = 20000;
 		// If the model has been active in `activityTimeout` window and no queries have been made in the last `queryInterval`, query the model to keep it alive
 		if (this.lastActivity !== null && currTime - this.lastActivity < activityTimeout && this.lastQuery !== null && currTime - this.lastQuery > queryInterval) {
-			const data = await this.queryModel("0", 1, 1, 0);
+			const data = await this.queryModel("1", 1, 1, 0);
 		}
 	}
 }
