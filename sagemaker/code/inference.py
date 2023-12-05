@@ -12,7 +12,7 @@ import torch.nn.functional as F
 from torch.nn import Linear, ReLU, Module
 
 from transformers import LlamaConfig
-from transformers.models.llama.modeling_llama import LlamaDecoderLayer, _make_causal_mask
+from transformers.models.llama.modeling_llama import LlamaDecoderLayer, AttentionMaskConverter
 
 class InceptionConfig():
     def __init__(self, in_channels, conv1_1, conv3_1, conv5_1, conv7_1, conv1_2, conv3_2, conv5_2, conv7_2, conv1_frommax):
@@ -98,7 +98,7 @@ class Lalama(nn.Module):
 
         # Sequence length of the cached keys and values
         past_key_values_length = past_key_values[0][0].shape[-2] if past_key_values is not None else 0
-        attention_mask = _make_causal_mask(hidden_states.shape[0:2], hidden_states.dtype, device, past_key_values_length)
+        attention_mask = AttentionMaskConverter._make_causal_mask(hidden_states.shape[0:2], hidden_states.dtype, device, past_key_values_length)
         position_id = torch.arange(start=past_key_values_length, end=past_key_values_length+seq_len, dtype=torch.long, device=device)
         position_ids = position_id.repeat(hidden_states.shape[0], 1) # Repeat position_id for each sample in the batch
 
@@ -257,6 +257,11 @@ class LalaE(nn.Module):
         output = (note_pred, prob_mass, velocity_pred, duration_pred, lalama_out[1]) if self.config.use_cache and not self.training else (note_pred, prob_mass, velocity_pred, duration_pred)
         return output
 
+    def get_past_key_values(self, source, past_key_values=None):
+        src = self.incep(source)
+        lalama_out = self.lalama(src, past_key_values)
+        return lalama_out[1]
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 NUM_NOTES = 64
@@ -342,17 +347,40 @@ def notes_str_to_feature_tensor(notes_str, num_notes):
         t += 1
     return notes_tensor
 
+def precompute_pkv(model, x, num_repeats):
+    '''
+        Input `x` shape: (1, timesteps, num_notes, 2), where the first dimension is to be repeated
+        Returns `past_key_values` of type Tuple(Tuple(Tensor[num_repeats, num_attn_heads, seq_len, head_dim]))
+    '''
+    def repeat_pkv(pkv, num_repeats):
+        repeat_shape = [num_repeats] + [1] * (len(pkv[0][0].shape) - 1) # Subtract 1 here because first dimension is the batch, which we will repeat
+        repeated_pkv = []
+        for layer in pkv:
+            new_layer = [cache.repeat(repeat_shape) for cache in layer]
+            repeated_pkv.append(new_layer)
+        return repeated_pkv
+    
+    with torch.no_grad():
+        pkv = model.get_past_key_values(x)
+        return repeat_pkv(pkv, num_repeats)
+
 def generate_music(model, seed, timesteps, num_repeats=1, selection_idx=0):
     '''
         Input `seed` and output shapes: (timesteps, num_notes, 2), where the last dimension has features (velocity, duration)
     '''
-    source = seed.unsqueeze(dim=0).repeat(num_repeats, 1, 1, 1)
+    if num_repeats <= 1:
+        past_key_values = None
+        source = seed.unsqueeze(dim=0).repeat(num_repeats, 1, 1, 1)
+    else:
+        # Prior to repeating the seed, cache the results of all timesteps minus the last one
+        seed_to_precompute = seed[:-1].unsqueeze(dim=0)
+        past_key_values = precompute_pkv(model, seed_to_precompute, num_repeats)
+        source = seed[-1:].unsqueeze(dim=0).repeat(num_repeats, 1, 1, 1)
+
     generated = []
     prob_masses = []
-
     model.eval()
     with torch.no_grad():
-        past_key_values = None
         for i in range(timesteps):
             note_pred, prob_mass, velocity_pred, duration_pred, past_key_values = model(source, past_key_values, last_step_only=True)
             # Use note_pred as a mask to select feature values
