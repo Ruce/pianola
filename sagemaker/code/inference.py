@@ -266,6 +266,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 NUM_NOTES = 64
 WINDOW_SIZE = 384
+TIMESTEPS_PER_CHUNK = 16
+OPTIONS_DELIMITER = '_'
 BASE_52_MAPPING = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
 
 def to_base_52(number):
@@ -287,7 +289,7 @@ def from_base_52(number_str):
         return total
     return custom_base_to_decimal(number_str, 52, BASE_52_MAPPING)
 
-def feature_tensor_to_str(feature_tensor):
+def feature_tensor_to_str(feature_tensors):
     '''
         Converts a tensor of shape (num_timesteps, num_notes, 2) to a string. Last dimension of tensor contains features (velocity, duration)
         Output is a delimited string, where each segment is separated by a number, and each segment is a timestep containing active notes in that step
@@ -295,38 +297,41 @@ def feature_tensor_to_str(feature_tensor):
         Of the base10 number, the first two digits is the note number (shifted by 2), next two digits is velocity (shifted by 1), and last three digits is duration (scaled by 10)
         E.g. 'KjJs' = 5088062: note = 50 - 2 = 48, velocity = 0.89, duration = 6.2
     '''
-    notes_list = []
-    for t in range(len(feature_tensor)):
-        slice_note_str = ''
-        tensor_slice = feature_tensor[t]
-        active_notes_in_slice = torch.nonzero(torch.sum(tensor_slice, dim=-1), as_tuple=True)[0].tolist()
-        for n in active_notes_in_slice:
-            # Transform velocity to a 2 digit integer ranging from 0 to 99
-            velocity = round((tensor_slice[n, 0].item() * 100) - 1)
-            velocity = max(min(velocity, 99), 0)
+    outputs = []
+    for feature_tensor in feature_tensors:
+        notes_list = []
+        for t in range(len(feature_tensor)):
+            slice_note_str = ''
+            tensor_slice = feature_tensor[t]
+            active_notes_in_slice = torch.nonzero(torch.sum(tensor_slice, dim=-1), as_tuple=True)[0].tolist()
+            for n in active_notes_in_slice:
+                # Transform velocity to a 2 digit integer ranging from 0 to 99
+                velocity = round((tensor_slice[n, 0].item() * 100) - 1)
+                velocity = max(min(velocity, 99), 0)
 
-            # Scale duration up by 10 so it is a 3 digit integer ranging from 0 to 999
-            duration = round(tensor_slice[n, 1].item() * 10)
-            duration = max(min(duration, 999), 1)
+                # Scale duration up by 10 so it is a 3 digit integer ranging from 0 to 999
+                duration = round(tensor_slice[n, 1].item() * 10)
+                duration = max(min(duration, 999), 1)
 
-            # N.B. Important: we shift the note up by 2 so that the base52 string is guaranteed to be 4 characters long
-            note_shifted = n + 2
+                # N.B. Important: we shift the note up by 2 so that the base52 string is guaranteed to be 4 characters long
+                note_shifted = n + 2
 
-            number_str = f"{note_shifted:02d}{velocity:02d}{duration:03d}"
-            slice_note_str += to_base_52(int(number_str))
-        notes_list.append(slice_note_str)
-    output = ''
-    spaces = 0
-    for notes_str in notes_list:
-        if notes_str == '':
-            spaces += 1
-        else:
-            # Add the number of spaces before this timestep of active notes
-            output += str(spaces) + notes_str
-            spaces = 0
-    if spaces > 0:
-        output += str(spaces)
-    return output
+                number_str = f"{note_shifted:02d}{velocity:02d}{duration:03d}"
+                slice_note_str += to_base_52(int(number_str))
+            notes_list.append(slice_note_str)
+        output = ''
+        spaces = 0
+        for notes_str in notes_list:
+            if notes_str == '':
+                spaces += 1
+            else:
+                # Add the number of spaces before this timestep of active notes
+                output += str(spaces) + notes_str
+                spaces = 0
+        if spaces > 0:
+            output += str(spaces)
+        outputs.append(output)
+    return OPTIONS_DELIMITER.join(outputs)
   
 def notes_str_to_feature_tensor(notes_str, num_notes):
     notes_slices = [x for x in re.split("\d+", notes_str) if x != '']
@@ -347,39 +352,50 @@ def notes_str_to_feature_tensor(notes_str, num_notes):
         t += 1
     return notes_tensor
 
+def select_pkv(pkv, idx):
+    selected_pkv = []
+    for layer in pkv:
+        selected_pkv.append([cache[idx:idx+1] for cache in layer])
+    return selected_pkv
+
+def repeat_pkv(pkv, num_repeats):
+    repeat_shape = [num_repeats] + [1] * (len(pkv[0][0].shape) - 1) # Subtract 1 here because first dimension is the batch, which we will repeat
+    repeated_pkv = []
+    for layer in pkv:
+        new_layer = [cache.repeat(repeat_shape) for cache in layer]
+        repeated_pkv.append(new_layer)
+    return repeated_pkv
+
 def precompute_pkv(model, x, num_repeats):
     '''
         Input `x` shape: (1, timesteps, num_notes, 2), where the first dimension is to be repeated
         Returns `past_key_values` of type Tuple(Tuple(Tensor[num_repeats, num_attn_heads, seq_len, head_dim]))
     '''
-    def repeat_pkv(pkv, num_repeats):
-        repeat_shape = [num_repeats] + [1] * (len(pkv[0][0].shape) - 1) # Subtract 1 here because first dimension is the batch, which we will repeat
-        repeated_pkv = []
-        for layer in pkv:
-            new_layer = [cache.repeat(repeat_shape) for cache in layer]
-            repeated_pkv.append(new_layer)
-        return repeated_pkv
-    
     with torch.no_grad():
         pkv = model.get_past_key_values(x)
         return repeat_pkv(pkv, num_repeats)
 
-def generate_music(model, seed, timesteps, num_repeats=1, selection_idx=0):
+def generate_music(model, seed, timesteps, num_repeats=1, selection_idx=0, past_key_values=None):
     '''
         Input `seed` and output shapes: (timesteps, num_notes, 2), where the last dimension has features (velocity, duration)
     '''
-    if num_repeats <= 1:
-        past_key_values = None
-        source = seed.unsqueeze(dim=0).repeat(num_repeats, 1, 1, 1)
+    assert num_repeats >= 1, 'Argument `num_repeats` cannot be less than 1'
+    
+    model.eval()
+    if num_repeats == 1:
+        source = seed.unsqueeze(dim=0)
     else:
-        # Prior to repeating the seed, cache the results of all timesteps minus the last one
-        seed_to_precompute = seed[:-1].unsqueeze(dim=0)
-        past_key_values = precompute_pkv(model, seed_to_precompute, num_repeats)
+        if past_key_values is None:
+            # Prior to repeating the seed, cache the results of all timesteps minus the last one
+            seed_to_precompute = seed[:-1].unsqueeze(dim=0)
+            past_key_values = precompute_pkv(model, seed_to_precompute, num_repeats)
+        else:
+            past_key_values = repeat_pkv(past_key_values, num_repeats)
         source = seed[-1:].unsqueeze(dim=0).repeat(num_repeats, 1, 1, 1)
-
+    
     generated = []
     prob_masses = []
-    model.eval()
+
     with torch.no_grad():
         for i in range(timesteps):
             note_pred, prob_mass, velocity_pred, duration_pred, past_key_values = model(source, past_key_values, last_step_only=True)
@@ -391,8 +407,67 @@ def generate_music(model, seed, timesteps, num_repeats=1, selection_idx=0):
             prob_masses.append(prob_mass)
     generated = torch.cat(generated, dim=1)
     prob_masses = torch.cat(prob_masses, dim=1).sum(dim=1)
-    sample_idx = prob_masses.argsort()[selection_idx]
-    return generated[sample_idx]
+    if selection_idx < 0:
+        # Return all generated samples with their corresponding prob and cache values
+        return generated, prob_masses, past_key_values
+    else:
+        sample_idx = prob_masses.argsort()[selection_idx]
+        return generated[sample_idx]
+
+def generate_options(model, seed, timesteps, timesteps_per_chunk, base_num_repeats):
+    # Split the timesteps into chunks so that we get more branching options
+    base_timesteps = min(timesteps_per_chunk, timesteps)
+
+    # Halve the number of repeats when generating options to speed up process
+    options_num_repeats = max(base_num_repeats // 2, 1)
+    options_timesteps = max(timesteps - base_timesteps, 0)
+    
+    # Generate base samples to branch from
+    generated, prob_masses, past_key_values = generate_music(model, seed, base_timesteps, base_num_repeats, selection_idx=-1)
+    
+    ## Get 3 options:
+    # 1. Lowest duration
+    # 2. Lowest probability mass (most chaotic)
+    # 3. Highest probability mass (most stable)
+
+    durations = torch.tensor([(sample[..., 1] > 0).sum() for sample in generated])
+    duration_idx = durations.argsort()[0]
+
+    prob_mass_indices = prob_masses.argsort().tolist()
+    prob_mass_indices.remove(duration_idx)
+    low_prob_idx = prob_mass_indices[0] if len(prob_mass_indices) > 0 else duration_idx
+    high_prob_idx = prob_mass_indices[-1] if len(prob_mass_indices) > 0 else duration_idx
+
+    duration_gen = generated[duration_idx]
+    low_prob_gen = generated[low_prob_idx]
+    high_prob_gen = generated[high_prob_idx]
+
+    def generate_branched_option(option_generated, option_selection, pkv):
+        timesteps = options_timesteps
+        while timesteps > 0:
+            curr_timesteps = min(timesteps_per_chunk, timesteps)
+            timesteps -= curr_timesteps
+
+            new_gen, new_prob_masses, new_pkv = generate_music(model, option_generated[-1:], curr_timesteps, options_num_repeats, selection_idx=-1, past_key_values=pkv)
+            new_durations = torch.tensor([(sample[..., 1] > 0).sum() for sample in new_gen])
+            match option_selection:
+                case 'duration':
+                    option_idx = new_durations.argsort()[0]
+                case 'low_prob':
+                    option_idx = new_prob_masses.argsort()[0]
+                case 'high_prob':
+                    option_idx = new_prob_masses.argsort()[-1]
+                case _:
+                    raise ValueError(f"Unknown option {option_selection}")
+            
+            option_generated = torch.cat((option_generated, new_gen[option_idx]))
+            pkv = select_pkv(new_pkv, option_idx)
+        return option_generated
+
+    duration_gen = generate_branched_option(duration_gen, 'duration', select_pkv(past_key_values, duration_idx))
+    low_prob_gen = generate_branched_option(low_prob_gen, 'low_prob', select_pkv(past_key_values, low_prob_idx))
+    high_prob_gen = generate_branched_option(high_prob_gen, 'high_prob', select_pkv(past_key_values, high_prob_idx))
+    return duration_gen, low_prob_gen, high_prob_gen
 
 # Define model and load weights
 def model_fn(model_dir):
@@ -443,8 +518,12 @@ def predict_fn(input_object, model):
     selection_idx = int(input_object['selection_idx'])
     # Trim input_object['data'] tensor to a maximum length of WINDOW_SIZE
     seed = input_object['data'][-WINDOW_SIZE:]
-    prediction = generate_music(model, seed, timesteps, num_repeats, selection_idx)
-    return prediction
+    if selection_idx >= 0:
+        prediction = generate_music(model, seed, timesteps, num_repeats, selection_idx)
+        predictions = (prediction,)
+    else:
+        predictions = generate_options(model, seed, timesteps, TIMESTEPS_PER_CHUNK, num_repeats)
+    return predictions
 
 
 # Return generated output as json
