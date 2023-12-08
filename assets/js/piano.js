@@ -11,7 +11,8 @@ class Piano {
 		this.octaves = octaves;
 		this.ticksPerBeat = ticksPerBeat;
 		this.pianoKeys = PianoKey.createPianoKeys(this.octaves);
-		this.keyMap = PianoKeyMap.keyMap;
+		this.keyMapShift = 9;
+		this.keyMap = PianoKeyMap.getKeyMap(this.keyMapShift, this.pianoKeys.length);
 		this.pianoCanvas = new PianoCanvas(this, canvasId);
 		this.pianoAudio = new PianoAudio(this.defaultBPM, this.pianoKeys)
 		this.model = model;
@@ -59,23 +60,31 @@ class Piano {
 		if (event.altKey || event.ctrlKey || event.shiftKey) return;
 		
 		this.lastActivity = new Date();
-		if (event.key === ' ') {
-			this.resetAll();
-		}
-		
-		if (event.key === 'ArrowLeft' || event.key === 'Backspace') {
-			this.rewind();
-		}
-		
-		const keyNum = this.keyMap[event.key];
-		if (keyNum !== undefined) {
-			this.keyPressed(keyNum);
+		switch (event.key) {
+			case ' ':
+				this.resetAll();
+				break;
+			case 'ArrowLeft':
+			case 'Backspace':
+				this.rewind();
+				break;
+			case 'ArrowUp':
+				this.shiftKeyMap(true);
+				break;
+			case 'ArrowDown':
+				this.shiftKeyMap(false);
+				break;
+			default:
+				const keyNum = this.keyMap[event.key.toLowerCase()];
+				if (keyNum !== undefined) {
+					this.keyPressed(keyNum);
+				}
 		}
 	}
 	
 	keyUp(event) {
 		this.lastActivity = new Date();
-		const keyNum = this.keyMap[event.key];
+		const keyNum = this.keyMap[event.key.toLowerCase()];
 		if (keyNum !== undefined) {
 			this.releaseNote(this.pianoKeys[keyNum]);
 		}
@@ -398,6 +407,23 @@ class Piano {
 			}
 		}
 		this.sharedHistory = null;
+	}
+	
+	shiftKeyMap(shiftUp) {
+		this.releaseAllNotes();
+		const prevKeyMapShift = this.keyMapShift;
+		if (shiftUp) {
+			this.keyMapShift = Math.min(this.keyMapShift + 1, this.octaves * 7 + 2); // Shift up no more than the maximum number of white keys minus 1
+		} else {
+			this.keyMapShift = Math.max(this.keyMapShift - 1, -(Object.keys(PianoKeyMap.whiteKeyMap).length - 1)); // Shift no down more than the maximum number of white hotkeys minus 1
+		}
+		
+		// Get new keyMap and redraw canvas if shift has changed
+		if (prevKeyMapShift !== this.keyMapShift) {
+			this.keyMap = PianoKeyMap.getKeyMap(this.keyMapShift, this.pianoKeys.length);
+			this.pianoCanvas.getHotkeyMaps();
+			this.pianoCanvas.triggerDraw();
+		}
 	}
 	
 	bindNotesCanvas(notesCanvas) {

@@ -92,7 +92,53 @@ class PianoKey {
 }
 
 class PianoKeyMap {
-	static get keyMap() {
-		return {'q': 15, '2': 16, 'w': 17, '3': 18, 'e': 19, 'r': 20, '5': 21, 't': 22, '6': 23, 'y': 24, '7': 25, 'u': 26, 'i': 27, '9': 28, 'o': 29, '0': 30, 'p': 31, '[': 32, '=': 33, ']': 34, 'a': 35, 'z': 36, 's': 37, 'x': 38, 'c': 39, 'f': 40, 'v': 41, 'g': 42, 'b': 43, 'n': 44, 'j': 45, 'm': 46, 'k': 47, ',': 48, 'l': 49, '.': 50, '/': 51};
+	static get whiteKeyMap() {
+		return {'q': 0, 'w': 1, 'e': 2, 'r': 3, 't': 4, 'y': 5, 'u': 6, 'i': 7, 'o': 8, 'p': 9, '[': 10, ']': 11, 'z': 12, 'x': 13, 'c': 14, 'v': 15, 'b': 16, 'n': 17, 'm': 18, ',': 19, '.': 20, '/': 21};
+	}
+	
+	static get blackKeyMap() {
+		return {'1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7, '9': 8, '0': 9, '-': 10, '=': 11, 'a': 12, 's': 13, 'd': 14, 'f': 15, 'g': 16, 'h': 17, 'j': 18, 'k': 19, 'l': 20, ';': 21, "'": 22};
+	}
+	
+	static getKeyNum(keyChar, shift) {
+		// N.B. Returns keyNums that may be out of range of the piano keyboard if shift is negative or very high
+		const isWhiteKey = keyChar in PianoKeyMap.whiteKeyMap;
+		const isBlackKey = keyChar in PianoKeyMap.blackKeyMap;
+		if (isWhiteKey && isBlackKey) {
+			throw new Error('Invalid key maps');
+		} else if (isWhiteKey) {
+			const colourKeyNum = PianoKeyMap.whiteKeyMap[keyChar];
+			return PianoKey.calcKeyNumFromColourKeyNum(colourKeyNum + shift, true);
+		} else if (isBlackKey) {
+			// Check whether this is a valid black key
+			const blackIdx = PianoKeyMap.blackKeyMap[keyChar];
+			const adjWhiteKeyNum = PianoKey.calcKeyNumFromColourKeyNum(blackIdx + shift, true); // Get the keyNum of the white key to the right of this black key
+			
+			// Check if the colour of the key before adjWhiteKey: if it is white, then keyChar is invalid (i.e. a non-existent black key based on `shift`)
+			if (PianoKey.calcIsWhiteKey(adjWhiteKeyNum - 1)) {
+				return null;
+			} else {
+				return adjWhiteKeyNum - 1;
+			}
+		} else {
+			return null;
+		}
+	}
+	
+	static getKeyMap(shift, numKeys) {
+		const keyMap = {};
+		for (const k of Object.keys(PianoKeyMap.whiteKeyMap)) {
+			const keyNum = PianoKeyMap.getKeyNum(k, shift);
+			if (keyNum !== null && keyNum >= 0 && keyNum < numKeys) {
+				keyMap[k] = keyNum;
+			}
+		}
+		for (const k of Object.keys(PianoKeyMap.blackKeyMap)) {
+			const keyNum = PianoKeyMap.getKeyNum(k, shift);
+			if (keyNum !== null && keyNum >= 0 && keyNum < numKeys) {
+				keyMap[k] = keyNum;
+			}
+		}
+		return keyMap;
 	}
 }

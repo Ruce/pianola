@@ -4,8 +4,7 @@ class PianoCanvas {
 		this.octaves = piano.octaves;
 		this.numWhiteKeys = 7 * this.octaves + 3; // 3 additional keys before and after main octaves
 		this.numBlackKeys = 5 * this.octaves + 1; // 1 additional key in the 0th octave
-		this.whiteHotkeyMap = this.getHotkeyMap(true);
-		this.blackHotkeyMap = this.getHotkeyMap(false);
+		this.getHotkeyMaps();
 		
 		this.hoverKey = null;
 		this.prevHoverKey = null;
@@ -106,6 +105,11 @@ class PianoCanvas {
 			const o = Math.floor((colourKeyNum-1) / 5); // Current octave (first full octave is index 0, unlike PianoKey convention)
 			return this.whiteKeyWidth * (PianoCanvas.blackKeyPos[k] + o*7 + 2);
 		}
+	}
+	
+	getHotkeyMaps() {
+		this.whiteHotkeyMap = this.getHotkeyMap(true);
+		this.blackHotkeyMap = this.getHotkeyMap(false);
 	}
 	
 	getHotkeyMap(isWhite) {
@@ -244,7 +248,7 @@ class PianoCanvas {
 			const hotkey = this.whiteHotkeyMap[i];
 			if (hotkey !== undefined) {
 				ctx.fillStyle = '#D2D2D2';
-				if (hotkey === '.' || hotkey === ',') {
+				if (hotkey === '.' || hotkey === ',' || hotkey === ';' || hotkey === "'") {
 					ctx.font = biggerKeyFont;
 				}
 				const textWidth = ctx.measureText(hotkey).width;
