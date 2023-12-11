@@ -58,6 +58,7 @@ class Piano {
 	keyDown(event) {
 		if (event.repeat) return;
 		if (event.altKey || event.ctrlKey || event.shiftKey) return;
+		if (event.target.classList.contains('historyTitle')) return;
 		
 		this.lastActivity = new Date();
 		switch (event.key) {

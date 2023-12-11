@@ -7,6 +7,7 @@ class History {
 		this.lastSeedNoteTime = 0;
 		this.parentHistory = null;
 		this.isNew = false; // Tracks whether any new (non-rewind) notes have been played
+		this.isShared = false;
 	}
 	
 	static getRecentHistory(noteHistory, startTime) {
@@ -74,7 +75,7 @@ class History {
 			simplifiedNoteHistory.push(noteCopy);
 		}
 		
-		const simplifiedHistory = { 'id': this.uuid, 'name': this.name, 'bpm': this.bpm, 'noteHistory': simplifiedNoteHistory };
+		const simplifiedHistory = { 'id': this.uuid, 'name': encodeURIComponent(this.name), 'bpm': this.bpm, 'noteHistory': simplifiedNoteHistory };
 		return JSON.stringify(simplifiedHistory);
 	}
 }
@@ -84,6 +85,32 @@ class HistoryController {
 		this.endpoint = endpoint;
 		this.allHistories = [];
 		this.allPianoRolls = [];
+	}
+	
+	static get titleCharLimit() {
+		return 50;
+	}
+	
+	static checkKeyPress(event) {
+		if (event.charCode && event.charCode === 13) {
+			event.target.blur();
+			event.preventDefault();
+		}
+		
+		if (event.target.textContent.length >= HistoryController.titleCharLimit) {
+			const selection = window.getSelection();
+			if (!selection || selection.toString().length <= 0) {
+				// Stop any further character inputs, unless some text was highlighted
+				event.preventDefault();
+			}
+		}
+	}
+	
+	static checkInputs(event) {
+		const text = event.target.textContent;
+		if (text.length > HistoryController.titleCharLimit){
+			event.target.textContent = text.slice(0, HistoryController.titleCharLimit);
+		}
 	}
 	
 	addToHistoryList(history, piano) {
@@ -96,7 +123,12 @@ class HistoryController {
 		const pianoRoll = new PianoRoll(history);
 		this.allPianoRolls.push(pianoRoll);
 		
+		/*
+		Create and attach elements to the DOM
+		*/
 		const textElement = document.createElement('div');
+		textElement.classList.add('historyTextContainer');
+		
 		const heartIcon = document.createElement('i');
 		const shareIcon = document.createElement('i');
 		historyElement.appendChild(pianoRoll.canvas);
@@ -106,27 +138,38 @@ class HistoryController {
 		historyElement.addEventListener('click', () => piano.replayHistory(historyIdx));
 		listContainer.appendChild(historyElement);
 		
+		/*
+		Format the history text: title, description, etc.
+		*/
+		const historyTitle = document.createElement('span');
+		historyTitle.classList.add('historyTitle');
+		historyTitle.spellcheck = false;
+		historyTitle.textContent = history.name;
+		if (!history.isShared) {
+			historyTitle.classList.add('historyTitleEditable');
+			historyTitle.contentEditable = true;
+			historyTitle.addEventListener('click', (event) => event.stopPropagation());
+			historyTitle.addEventListener('keypress', (event) => HistoryController.checkKeyPress(event));
+			historyTitle.addEventListener('input', (event) => HistoryController.checkInputs(event));
+			historyTitle.addEventListener('blur', (event) => this.updateHistoryName(history, historyTitle.textContent));
+		}
+		
+		const historyDescriptionDuration = document.createElement('span');
+		historyDescriptionDuration.classList.add('historyDescription');
 		// Get the total length of this piece and format to string
 		const historyLength = history.noteHistory.at(-1).time + history.noteHistory.at(-1).duration - history.noteHistory[0].time;
 		const historySeconds = Math.ceil(historyLength % 60);
 		const historyMinutes = Math.floor(historyLength / 60);
-		const historyLengthStr = `${historyMinutes}:${historySeconds.toString().padStart(2, '0')}`;
+		historyDescriptionDuration.textContent = `History ${this.allHistories.length} - ${historyMinutes}m ${historySeconds.toString().padStart(2, '0')}s`;
 		
+		const historyDescriptionTime = document.createElement('span');
+		historyDescriptionTime.classList.add('historyDescription');
 		const dateOptions = {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'};
-		textElement.classList.add('historyTextContainer');
-		textElement.innerHTML = `<span class="historyTitle">${this.allHistories.length}. ${history.name}</span>`;
-		textElement.innerHTML += `<span class="historyDescription">${history.start.toLocaleString('en-US', dateOptions)}</span>`;
-		textElement.innerHTML += `<span class="historyDescription">${historyLengthStr}</span>`;
+		historyDescriptionTime.textContent = history.start.toLocaleString('en-US', dateOptions);
 		
-		heartIcon.classList.add('heartIcon');
-		heartIcon.classList.add('fa-regular');
-		heartIcon.classList.add('fa-heart');
-		heartIcon.addEventListener('click', toggleHeartIcon);
-		
-		shareIcon.classList.add('shareIcon');
-		shareIcon.classList.add('fa-regular');
-		shareIcon.classList.add('fa-share-from-square');
-		shareIcon.addEventListener('click', (event) => this.shareHistory(event, historyIdx));
+		textElement.appendChild(historyTitle);
+		textElement.appendChild(historyDescriptionDuration);
+		textElement.appendChild(historyDescriptionTime);
 		
 		// Check if this history is a variant of another
 		let parent = history.parentHistory;
@@ -138,8 +181,30 @@ class HistoryController {
 			}
 		}
 		if (parent !== null) {
-			textElement.innerHTML += `<span class="historyDescription">Variant of History ${this.allHistories.indexOf(parent) + 1}</span>`;;
+			const historyDescriptionVariant = document.createElement('span');
+			historyDescriptionVariant.classList.add('historyDescription');
+			historyDescriptionVariant.textContent = `Variant of History ${this.allHistories.indexOf(parent) + 1}`;
+			textElement.appendChild(historyDescriptionVariant);
 		}
+		if (history.isShared) {
+			const historyDescriptionShared = document.createElement('span');
+			historyDescriptionShared.classList.add('historyDescription');
+			historyDescriptionShared.textContent = 'Shared with you';
+			textElement.appendChild(historyDescriptionShared);
+		}
+		
+		/*
+		Format heart and share icons
+		*/
+		heartIcon.classList.add('heartIcon');
+		heartIcon.classList.add('fa-regular');
+		heartIcon.classList.add('fa-heart');
+		heartIcon.addEventListener('click', toggleHeartIcon);
+		
+		shareIcon.classList.add('shareIcon');
+		shareIcon.classList.add('fa-regular');
+		shareIcon.classList.add('fa-share-from-square');
+		shareIcon.addEventListener('click', (event) => this.shareHistory(event, historyIdx));
 		
 		pianoRoll.draw();
 	}
@@ -165,6 +230,7 @@ class HistoryController {
 		const linkTextElement = document.createElement('input');
 		linkTextElement.classList.add('shareLinkInputText');
 		linkTextElement.type = 'text';
+		linkTextElement.readOnly = true;
 		linkTextElement.value = shareLink;
 		
 		const linkCopyIcon = document.createElement('i');
@@ -222,8 +288,9 @@ class HistoryController {
 			const data = await response.json();
 			if (!data.Item) return null;
 			
-			const sharedHistory = new History(data.Item.bpm, data.Item.name);
+			const sharedHistory = new History(data.Item.bpm, decodeURIComponent(data.Item.name));
 			sharedHistory.uuid = data.Item.id;
+			sharedHistory.isShared = true;
 			for (const note of data.Item.noteHistory) {
 				sharedHistory.add(new Note(piano.pianoKeys[note.k], note.v, note.d, note.t, Actor.Actors.find(a => a.name === note.a)));
 			}
@@ -231,6 +298,16 @@ class HistoryController {
 			return sharedHistory;
 		} catch (error) {
 			console.log('Error fetching shared history:', error);
+		}
+	}
+	
+	async updateHistoryName(history, newName) {
+		if (history.name === newName) return;
+		
+		history.name = newName;
+		if (history.uuid) {
+			// Update database with the new name
+			await this.uploadHistory(history);
 		}
 	}
 }

@@ -260,8 +260,19 @@ hr {
 	display: block;
 	font-size: 14px;
 	font-weight: bold;
-	overflow: hidden;
 	white-space: normal;
+	overflow: hidden;
+	overflow-wrap: break-word;
+}
+
+.historyTitleEditable {
+	cursor: text;
+}
+
+.historyTitleEditable:hover {
+	background-color: $menuLightColor;
+	border: none;
+	border-radius: 5px;
 }
 
 .historyDescription {
