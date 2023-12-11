@@ -122,11 +122,9 @@ class PianolaModel {
 		});
 	}
 	
-	async queryModel(queryString, timesteps, numRepeats, selectionIdx) {
+	async queryModel(queryString, timesteps, numRepeats, selectionIdx, maxRetries, delayMs) {
 		this.lastQuery = new Date();
 		const endpointURI = this.endpoint + new URLSearchParams({notes: queryString, timesteps: timesteps, num_repeats: numRepeats, selection_idx: selectionIdx});
-		const maxRetries = 20;
-		const delayMs = 100;
 		try {
 			const data = await PianolaModel.fetchWithRetry(endpointURI, maxRetries, delayMs);
 			return data;
@@ -137,7 +135,10 @@ class PianolaModel {
 	
 	async connectToModel(callback) {
 		this.lastActivity = new Date();
-		const data = await this.queryModel("1", 1, 1, 0);
+		
+		const maxRetries = 25;
+		const delayMs = 400;
+		const data = await this.queryModel("1", 1, 1, 0, maxRetries, delayMs);
 		console.log(new Date().toISOString(), `Connected to model [${data}]`);
 		
 		if (typeof data !== 'undefined' && !data.hasOwnProperty('message')) {
@@ -146,7 +147,7 @@ class PianolaModel {
 			callback();
 		} else {
 			// Wait a short while before trying to connect to model again
-			setTimeout(this.connectToModel.bind(this, callback), 500);
+			setTimeout(this.connectToModel.bind(this, callback), 1000);
 		}
 	}
 	
@@ -163,11 +164,13 @@ class PianolaModel {
 		*/
 		this.lastActivity = new Date();
 		var generated = [];
+		const maxRetries = 20;
+		const delayMs = 200;
 		
 		if (this.isConnected) {
 			const queryString = PianolaModel.historyToQueryString(history, start, end, interval);
 			console.log(new Date().toISOString(), 'Query:', queryString);
-			const data = await this.queryModel(queryString, timesteps, numRepeats, selectionIdx);
+			const data = await this.queryModel(queryString, timesteps, numRepeats, selectionIdx, maxRetries, delayMs);
 			console.log(new Date().toISOString(), 'Data:', data);
 			
 			if (!data.hasOwnProperty('message')) {
@@ -185,7 +188,9 @@ class PianolaModel {
 		const queryInterval = 20000;
 		// If the model has been active in `activityTimeout` window and no queries have been made in the last `queryInterval`, query the model to keep it alive
 		if (this.lastActivity !== null && currTime - this.lastActivity < activityTimeout && this.lastQuery !== null && currTime - this.lastQuery > queryInterval) {
-			const data = await this.queryModel("1", 1, 1, 0);
+			const maxRetries = 5;
+			const delayMs = 2000;
+			const data = await this.queryModel("1", 1, 1, 0, maxRetries, delayMs);
 		}
 	}
 }
