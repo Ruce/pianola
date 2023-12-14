@@ -7,8 +7,8 @@ $playerWhiteBarColor: #FDFD66;
 $playerBlackBarColor: #FFBF00;
 $modelWhiteBarColor: #BEFCFF;
 $modelBlackBarColor: #5EBBBF;
-$botWhiteBarColor: #AFFED7;
-$botBlackBarColor: #59DD9C;
+$botWhiteBarColor: #C2FECE;
+$botBlackBarColor: #5CE477;
 
 $bodyFont: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
 
@@ -754,9 +754,9 @@ input[type="text"], textarea {
 	border: none;
 	color: white;
 	padding: 10px 30px;
-	margin: 0 5px;
+	margin: 0 4px;
 	min-width: 120px;
-	border-radius: 8px;
+	border-radius: 4px;
 	cursor: pointer;
 	font-size: 16px;
 	font-weight: bold;
@@ -847,12 +847,12 @@ input[type="text"], textarea {
 	display: inline-block;
 	position: relative;
 	vertical-align: top;
-	margin: 30px 10px;
+	margin: 34px 8px;
 }
 
 .modeBox {
 	width: 150px;
-	height: 90px;
+	height: 92px;
 	padding: 10px 15px;
 	border: 1px solid $modelWhiteBarColor;
 	border-radius: 5px;

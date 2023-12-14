@@ -18,7 +18,7 @@ class NoteBar {
 		return {
 			player: { white: '#FDFD66', black: '#FFBF00', shadow: 'yellow'},
 			model: { white: '#BEFCFF', black: '#5EBBBF', shadow: '#7DF9FF'},
-			bot: { white: '#AFFED7', black: '#59DD9C', shadow: '#79FDBC'}
+			bot: { white: '#C2FECE', black: '#5CE477', shadow: '#75FD90'}
 		};
 	}
 	

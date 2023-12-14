@@ -202,8 +202,13 @@ function closeMode(toSave) {
 	
 	if (toSave) {
 		const selectedRadio = document.querySelector('input[name="modeOptions"]:checked');
-		if (selectedRadio) piano.mode = PianoMode.getModeByName(selectedRadio.value);
-		piano.resetAll();
+		if (selectedRadio) {
+			const newMode = PianoMode.getModeByName(selectedRadio.value);
+			if (piano.mode !== newMode) {
+				piano.mode = newMode;
+				piano.resetAll();
+			}
+		}
 	} else {
 		const radioButtons = document.querySelectorAll('input[name="modeOptions"]');
 		for (const radioButton of radioButtons) {
