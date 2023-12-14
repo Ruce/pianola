@@ -382,7 +382,7 @@ input[type="text"], textarea {
 	top: 10px;
 	left: 50%;
 	transform: translateX(-50%);
-	width: 390px;
+	width: 458px;
 	height: 35px;
 	background-color: $menuBackgroundColor;
 	opacity: 0.95;
@@ -538,10 +538,15 @@ input[type="text"], textarea {
 	margin-top: -6px; /* Centers thumb on the track */
 }
 
+.modeButtonShape {
+	background-image: url('../img/music-note.svg');
+	background-size: cover;
+}
+
 .verticalSeparator {
 	width: 1px;
 	height: 100%;
-	margin: 8px;
+	margin: 10px;
 	background-color: grey;
 }
 
@@ -662,7 +667,7 @@ input[type="text"], textarea {
 }
 
 
-#overlay {
+.overlay {
 	display: block;
 	position: fixed;
 	top: 0;
@@ -689,17 +694,23 @@ input[type="text"], textarea {
 	font-size: 87%;
 }
 
-#definitionText {
+.definitionText {
 	color: $modelWhiteBarColor;
 }
 
-#definitionText > h1 {
+.definitionText > h1 {
 	color: $modelBlackBarColor;
 	font-size: xx-large;
 	margin: 0;
 }
 
-#definitionText > .pronunciation {
+.definitionText > h2 {
+	color: $modelBlackBarColor;
+	font-size: x-large;
+	margin: 0;
+}
+
+.definitionText > .pronunciation {
 	font-size: smaller;
 }
 
@@ -738,21 +749,26 @@ input[type="text"], textarea {
 	margin: 14px 0;
 }
 
-#introSharedPlay {
-	display: block;
+.overlayButton {
+	display: inline-block;
 	border: none;
-	background: $modelBlackBarColor;
 	color: white;
 	padding: 10px 30px;
-	border-radius: 6px;
+	margin: 0 5px;
+	min-width: 120px;
+	border-radius: 8px;
 	cursor: pointer;
 	font-size: 16px;
 	font-weight: bold;
 	text-align: center;
 }
 
-#introSharedPlay:hover {
-	opacity: 0.95;
+.overlayButton:hover {
+	opacity: 0.9;
+}
+
+#introSharedPlay {
+	background: $modelBlackBarColor;
 }
 
 #introFooter {
@@ -806,6 +822,75 @@ input[type="text"], textarea {
 
 .closeButton::after {
 	transform: rotate(-45deg);
+}
+
+#modeOverlay {
+	display: none;
+}
+
+#modeMenu {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	max-width: 640px;
+	transform: translate(-50%, -50%);
+	background: $menuDarkColor;
+	color: white;
+	padding: 25px;
+	border: 1px solid;
+	border-color: $modelBlackBarColor;
+	border-radius: 10px;
+	text-align: center;
+}
+
+.modeOption {
+	display: inline-block;
+	position: relative;
+	vertical-align: top;
+	margin: 30px 10px;
+}
+
+.modeBox {
+	width: 150px;
+	height: 90px;
+	padding: 10px 15px;
+	border: 1px solid $modelWhiteBarColor;
+	border-radius: 5px;
+	text-align: left;
+	vertical-align: top;
+	cursor: pointer;
+}
+
+.modeOptionTitle {
+	font-weight: bold;
+	color: $modelWhiteBarColor;
+}
+
+.modeOptionText {
+	font-size: small;
+}
+
+.modeOption input[type="radio"] {
+	position: absolute;
+	right: 13px;
+	top: 13px;
+	cursor: pointer;
+}
+
+.modeOption input[type="radio"]:checked + .modeBox {
+	background-color: $modelBlackBarColor;
+}
+
+.modeButtonsContainer {
+	text-align: center;
+}
+
+#modeCancel {
+	background: $menuLightColor;
+}
+
+#modeSelect {
+	background: $modelBlackBarColor;
 }
 
 #noteBarContainer {

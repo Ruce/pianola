@@ -40,13 +40,14 @@ layout: default
 		<button class="menuButton" onclick="toggleMute()"><div class="menuButtonShape volumeButtonShape" id="volumeButtonImage"></div><div class="menuButtonTooltip" id="menuMuteTooltip">Mute</div></button>
 		<input type="range" class="volumeSlider" id="volumeSlider" min="0" max="100" value="85">
 		<div class="verticalSeparator"></div>
-		<button class="menuButton" onclick="openOverlay()"><div class="menuButtonShape helpButtonShape"><div class="helpButtonInner">i</div></div><div class="menuButtonTooltip">Help</div></button>
+		<button class="menuButton" onclick="openMode()"><div class="menuButtonShape modeButtonShape"></div><div class="menuButtonTooltip">Mode</div></button>
+		<button class="menuButton" onclick="openIntro()"><div class="menuButtonShape helpButtonShape"><div class="helpButtonInner">i</div></div><div class="menuButtonTooltip">Help</div></button>
 	</div>
 </div>
-<div id="overlay" onclick="closeOverlay()">
+<div class="overlay" id="introOverlay" onclick="closeIntro()">
 	<div id="introduction">
-		<button class="closeButton" id="closeIntroButton" onclick="closeOverlay()"></button>
-		<div id="definitionText"><h1>pianola</h1>
+		<button class="closeButton" id="closeIntroButton" onclick="closeIntro()"></button>
+		<div class="definitionText"><h1>pianola</h1>
 		<span class="pronunciation">/pɪəˈnəʊlə/</span><br>
 		<span><i>(noun) A self-playing, self-composing AI piano.</i></span></div>
 		<div id="introText">
@@ -81,8 +82,40 @@ layout: default
 					<p>You can also create your own pieces by prompting the AI with a short snippet or an example seed from the Play menu.</p>
 				</div>
 			</div>
-			<button id="introSharedPlay" onclick="playShared()">Let's Roll</button>
+			<button class="overlayButton" id="introSharedPlay" onclick="playShared()">Let's Roll</button>
 		</div>
 		<span id="introFooter"><i>For technical information, see the <a href="https://github.com/Ruce/pianola" target="_blank" rel="noopener noreferrer">GitHub repository</a></i></span>
+	</div>
+</div>
+<div class="overlay" id="modeOverlay">
+	<div id="modeMenu">
+		<div class="definitionText"><h2>Mode</h2></div>
+		<form>
+			<label class="modeOption">
+				<input type="radio" name="modeOptions" value="composer" checked>
+				<div class="modeBox">
+					<span class="modeOptionTitle">Composer</span>
+					<p class="modeOptionText">Choose from various generated options to compose your own piece</p>
+				</div>
+			</label>
+			<label class="modeOption">
+				<input type="radio" name="modeOptions" value="autoplay">
+				<div class="modeBox">
+					<span class="modeOptionTitle">Autoplay</span>
+					<p class="modeOptionText">Let Pianola compose and play continuously by itself</p>
+				</div>
+			</label>
+			<label class="modeOption">
+				<input type="radio" name="modeOptions" value="freeplay">
+				<div class="modeBox">
+					<span class="modeOptionTitle">Free Play</span>
+					<p class="modeOptionText">Disable music generation to just play the piano</p>
+				</div>
+			</label>
+		</form>
+		<div class="modeButtonsContainer">
+			<button class="overlayButton" id="modeCancel" onclick="closeMode(false)">Cancel</button>
+			<button class="overlayButton" id="modeSelect" onclick="closeMode(true)">Select</button>
+		</div>
 	</div>
 </div>

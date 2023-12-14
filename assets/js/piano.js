@@ -17,6 +17,7 @@ class Piano {
 		this.pianoAudio = new PianoAudio(this.defaultBPM, this.pianoKeys)
 		this.model = model;
 		this.historyController = historyController;
+		this.mode = PianoMode.Autoplay;
 		
 		this.lastActivity = new Date();
 		this.modelStartTime = null;
@@ -49,7 +50,10 @@ class Piano {
 	
 	keyPressed(keyNum) {
 		if (this.pianoAudio.startTone()) {
-			this.seedInputListener();
+			this.startHistory();
+			if (this.mode === PianoMode.Composer || this.mode === PianoMode.Autoplay) {
+				this.seedInputListener();
+			}
 		}
 		this.playNote(new Note(this.pianoKeys[keyNum], 0.8, -1, Tone.Transport.seconds, Actor.Player));
 		this.lastActivity = new Date();
@@ -236,10 +240,16 @@ class Piano {
 		}
 	}
 	
-	seedInputListener() {
+	startHistory() {
 		this.pianoAudio.setBPM(this.defaultBPM);
-		this.currHistory = new History(this.pianoAudio.bpm, "Player prompt");
-		
+		if (this.mode === PianoMode.Freeplay) {
+			this.currHistory = new History(this.pianoAudio.bpm, "Free play");
+		} else {
+			this.currHistory = new History(this.pianoAudio.bpm, "Player prompt");
+		}
+	}
+	
+	seedInputListener() {
 		// Start listener progress bar
 		NProgress.configure({ minimum: 0.15, trickle: false });
 		NProgress.start();
@@ -308,11 +318,13 @@ class Piano {
 			this.scheduleNote(new Note(this.pianoKeys[note.keyNum], note.velocity, note.duration, note.time, Actor.Bot));
 		}
 		this.currHistory.lastSeedNoteTime = notes.at(-1).time;
-		this.scheduleStartModel(this.currHistory.lastSeedNoteTime);
+		if (this.mode === PianoMode.Autoplay) {
+			this.scheduleStartModel(this.currHistory.lastSeedNoteTime);
+		}
 	}
 	
 	rewind() {
-		if (!this.pianoAudio.toneStarted || this.awaitingInput) return false;
+		if (!this.pianoAudio.toneStarted || this.awaitingInput || this.mode === PianoMode.Freeplay) return false;
 		
 		// Copy queued notes before they are cleared; queue may be needed for replaying notes when rewinding
 		const queuedNotes = [...this.noteQueue];
@@ -368,7 +380,7 @@ class Piano {
 		return true;
 	}
 	
-	replayHistory(idx) {
+	replayHistory(idx, toContinue=true) {
 		this.resetAll();
 		const history = this.historyController.allHistories[idx];
 		this.currHistory = new History(history.bpm, history.name);
@@ -382,7 +394,13 @@ class Piano {
 			const newNote = new Note(note.key, note.velocity, note.duration, note.time, note.actor, null, true);
 			this.scheduleNote(newNote);
 		}
-		this.scheduleStartModel(history.noteHistory.at(-1).time);
+		
+		const lastNote = history.noteHistory.at(-1);
+		if (this.mode === PianoMode.Autoplay && toContinue) {
+			this.scheduleStartModel(lastNote.time);
+		} else {
+			Tone.Transport.scheduleOnce(() => this.resetAll(), lastNote.time + lastNote.duration + 1);
+		}
 	}
 	
 	async loadSharedHistory(uuid) {
@@ -404,7 +422,7 @@ class Piano {
 		if (this.sharedHistory) {
 			const historyIdx = this.historyController.allHistories.indexOf(this.sharedHistory);
 			if (historyIdx !== -1) {
-				this.replayHistory(historyIdx);
+				this.replayHistory(historyIdx, false);
 			}
 		}
 		this.sharedHistory = null;

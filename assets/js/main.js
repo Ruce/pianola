@@ -6,6 +6,7 @@
 {% include_relative pianoAudio.js %}
 {% include_relative pianoCanvas.js %}
 {% include_relative pianoKey.js %}
+{% include_relative pianoMode.js %}
 {% include_relative pianoRoll.js %}
 {% include_relative history.js %}
 {% include_relative note.js %}
@@ -42,6 +43,7 @@ function initialisePage() {
 	initialiseVolumeSlider();
 	initialiseSeeds();
 	initialiseRewindReceiver();
+	closeMode(false); // Sets the mode radio button to the default in `piano`
 	
 	const historyPromise = loadHistory();
 	const tonePromise = Tone.ToneAudioBuffer.loaded()
@@ -54,6 +56,7 @@ function initialisePage() {
 	document.addEventListener("keydown", (event) => piano.keyDown(event));
 	document.addEventListener("keyup", (event) => piano.keyUp(event));
 	document.getElementById("introduction").onclick = function(event) { event.stopPropagation(); }
+	document.getElementById("modeMenu").onclick = function(event) { event.stopPropagation(); }
 }
 
 function loadingComplete() {
@@ -171,23 +174,44 @@ function stopMusic() {
 	}
 }
 
-function openOverlay() {
-    document.getElementById('overlay').style.display = 'block';
+function openIntro() {
+    document.getElementById('introOverlay').style.display = 'block';
 	document.getElementById('introText').style.display = 'block';
 	document.getElementById('closeIntroButton').style.display = 'block';
 	document.getElementById('introShared').style.display = 'none';
 }
 
-function closeOverlay() {
+function closeIntro() {
     // Close the overlay if there isn't a shared history waiting to be played
 	if (!piano.sharedHistory) {
-		document.getElementById('overlay').style.display = 'none';
+		document.getElementById('introOverlay').style.display = 'none';
 	}
 }
 
 function playShared() {
 	piano.playSharedHistory();
-	closeOverlay();
+	closeIntro();
+}
+
+function openMode() {
+	document.getElementById('modeOverlay').style.display = 'block';
+}
+
+function closeMode(toSave) {
+	document.getElementById('modeOverlay').style.display = 'none';
+	
+	if (toSave) {
+		const selectedRadio = document.querySelector('input[name="modeOptions"]:checked');
+		if (selectedRadio) piano.mode = PianoMode.getModeByName(selectedRadio.value);
+		piano.resetAll();
+	} else {
+		const radioButtons = document.querySelectorAll('input[name="modeOptions"]');
+		for (const radioButton of radioButtons) {
+			if (radioButton.value === piano.mode.name) {
+				radioButton.checked = true;
+			}
+		}
+	}
 }
 
 function pauseFramesCheck() {
