@@ -23,19 +23,13 @@ var notesCanvas;
 var exampleSongs;
 var globalMouseDown = false;
 
-function hideLoader() {
-	document.getElementById('loaderCircle').classList.add('complete');
-	document.getElementById('loaderText').classList.add('complete');
-	document.getElementById('loaderCheckmark').classList.add('draw');
-	setTimeout(() => document.getElementById("connectionLoader").style.display = "none", 1800);
-}
-
 function initialisePage() {
 	NProgress.configure({ showSpinner: false, trickle: true });
 	NProgress.start();
 	
 	model = new PianolaModel(endpointBaseUrl);
-	model.connectToModel(hideLoader);
+	connectToModel(model);
+	
 	historyController = new HistoryController(databaseBaseUrl);
 	piano = new Piano('pianoCanvas', octaves, ticksPerBeat, model, historyController);
 	notesCanvas = new NotesCanvas('notesCanvas', piano);
@@ -53,10 +47,30 @@ function initialisePage() {
 		setTimeout(() => loadingComplete(), 300);
 	});
 	
-	document.addEventListener("keydown", (event) => piano.keyDown(event));
-	document.addEventListener("keyup", (event) => piano.keyUp(event));
-	document.getElementById("introduction").onclick = function(event) { event.stopPropagation(); }
-	document.getElementById("modeMenu").onclick = function(event) { event.stopPropagation(); }
+	document.addEventListener('keydown', (event) => piano.keyDown(event));
+	document.addEventListener('keyup', (event) => piano.keyUp(event));
+	document.getElementById('introduction').onclick = function(event) { event.stopPropagation(); }
+	document.getElementById('modeMenu').onclick = function(event) { event.stopPropagation(); }
+}
+
+function showLoader() {
+	document.getElementById('loaderCircle').classList.remove('complete');
+	document.getElementById('loaderText').classList.remove('complete');
+	document.getElementById('loaderCheckmark').classList.remove('draw');
+	document.getElementById('connectionLoader').style.display = 'block';
+}
+
+function hideLoader() {
+	document.getElementById('loaderCircle').classList.add('complete');
+	document.getElementById('loaderText').classList.add('complete');
+	document.getElementById('loaderCheckmark').classList.add('draw');
+	setTimeout(() => document.getElementById('connectionLoader').style.display = 'none', 1800);
+}
+
+function connectToModel(model) {
+	showLoader();
+	model.isConnected = false;
+	model.connectToModel(hideLoader);
 }
 
 function loadingComplete() {
@@ -70,7 +84,7 @@ function loadingComplete() {
 function redrawCanvases() {
 	const pianoDiv = document.getElementById('pianoDiv');
 	const pianoHeight = window.innerWidth * PianoCanvas.keyboardRatio;
-	pianoDiv.style.height = pianoHeight + "px";
+	pianoDiv.style.height = pianoHeight + 'px';
 	piano.pianoCanvas.triggerDraw();
 	notesCanvas.draw();
 	for (const pianoRoll of piano.historyController.allPianoRolls) {
@@ -84,7 +98,7 @@ function initialiseVolumeSlider() {
 	previousVolume = Math.round(slider.value);
 	piano.pianoAudio.changeVolume(previousVolume);
 	
-	slider.addEventListener("input", (event) => {
+	slider.addEventListener('input', (event) => {
 		const newVolume = Math.round(event.target.value);
 		previousVolume = newVolume;
 		piano.pianoAudio.changeVolume(newVolume);
@@ -111,7 +125,7 @@ function initialiseSeeds() {
 }
 
 function initialiseRewindReceiver() {
-	const rewindReceiver = document.getElementById("rewindReceiver");
+	const rewindReceiver = document.getElementById('rewindReceiver');
 	
 	function rewindAnimated() {
 		const rewindSuccess = piano.rewind();
@@ -207,6 +221,10 @@ function closeMode(toSave) {
 			if (piano.mode !== newMode) {
 				piano.mode = newMode;
 				piano.resetAll();
+				if (piano.mode === PianoMode.Composer || piano.mode === PianoMode.Autoplay) {
+					console.log('connecting..')
+					connectToModel(model);
+				}
 			}
 		}
 	} else {
@@ -265,10 +283,10 @@ function dismissShareLinkTooltip(event) {
 	}
 }
 
-document.addEventListener("DOMContentLoaded", initialisePage);
-document.addEventListener("visibilitychange", pauseFramesCheck);
-document.addEventListener("mouseup", () => globalMouseDown = false);
-document.addEventListener("click", dismissShareLinkTooltip);
+document.addEventListener('DOMContentLoaded', initialisePage);
+document.addEventListener('visibilitychange', pauseFramesCheck);
+document.addEventListener('mouseup', () => globalMouseDown = false);
+document.addEventListener('click', dismissShareLinkTooltip);
 
 var resizeTimeout = false;
 const resizeDelay = 40;
