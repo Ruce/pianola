@@ -222,7 +222,6 @@ function closeMode(toSave) {
 				piano.mode = newMode;
 				piano.resetAll();
 				if (piano.mode === PianoMode.Composer || piano.mode === PianoMode.Autoplay) {
-					console.log('connecting..')
 					connectToModel(model);
 				}
 			}

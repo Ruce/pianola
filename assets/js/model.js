@@ -176,7 +176,15 @@ class PianolaModel {
 			if (!data.hasOwnProperty('message')) {
 				const offset = interval / 2; // Half of a tick interval length
 				const generatedStart = end + offset; // Generated notes start at an offset from the end time so that they are centered within an interval
-				generated = PianolaModel.queryStringToNotes(data, generatedStart, interval);
+				const options = data.split('_');
+				if (options.length === 1) {
+					generated = PianolaModel.queryStringToNotes(options[0], generatedStart, interval);
+				} else {
+					// Split multiple options by delimiter
+					for (const option of options) {
+						generated.push(PianolaModel.queryStringToNotes(option, generatedStart, interval));
+					}
+				}
 			}
 		}
 		return generated;

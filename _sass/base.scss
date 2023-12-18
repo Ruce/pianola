@@ -377,6 +377,65 @@ input[type="text"], textarea {
 	cursor: pointer;
 }
 
+#composeOptionsContainer {
+	display: none;
+	position: absolute;
+	bottom: 27px;
+	left: 50%;
+	transform: translateX(-50%);
+}
+
+.composeOption {
+	display: inline-block;
+	width: 184px;
+	height: 184px;
+	margin: 8px;
+	background-color: $menuBackgroundColor;
+	border: grey 1px solid;
+	border-radius: 5px;
+	color: white;
+	opacity: 0.9;
+	text-align: center;
+	user-select: none;
+}
+
+.composeOptionsTextContainer {
+	display: block;
+	width: 100%;
+	margin: 6px 0;
+}
+
+.composeOptionTitle {
+	display: block;
+	font-size: 15px;
+	font-weight: bold;
+	margin: 9px 0 8px 0;
+}
+
+.selectButtonShape {
+	background-image: url('../img/check.svg');
+	background-size: cover;
+}
+
+.composeButtonTooltip {
+	display: none;
+	position: absolute;
+	top: 100%;
+	padding: 5px;
+	transform: translateX(-5px);
+	border-radius: 5px;
+	background-color: $menuLightColor;
+	font-family: Arial;
+	font-size: 11px;
+	color: white;
+	pointer-events: none;
+	user-select: none;
+}
+
+.menuButton:hover > .composeButtonTooltip {
+	display: block;
+}
+
 .menuContainer {
 	position: absolute;
 	top: 10px;
@@ -412,6 +471,7 @@ input[type="text"], textarea {
 	position: absolute;
 	top: 110%;
 	padding: 5px;
+	transform: translateX(-5px);
 	border-radius: 5px;
 	background-color: $menuLightColor;
 	font-family: Arial;
