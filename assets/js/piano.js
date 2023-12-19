@@ -95,7 +95,7 @@ class Piano {
 		}
 	}
 	
-	playNote(note, contextTime=Tone.getContext().currentTime) {
+	playNote(note, contextTime=Tone.getContext().currentTime, toSave=true) {
 		// Check if pianoKey is already active, i.e. note is played again while currently held down, and if so release it
 		this.releaseNote(note.key, note.time);
 		if (note.duration === -1) {
@@ -108,7 +108,7 @@ class Piano {
 		
 		// Keep track of note in `activeNotes` and `noteHistory`
 		this.activeNotes.push(note);
-		this.currHistory.add(note);
+		if (toSave) this.currHistory.add(note);
 		
 		// Draw note on canvases
 		const startTime = new Date(this.contextDateTime);
@@ -146,9 +146,10 @@ class Piano {
 		}
 	}
 	
-	scheduleNote(note) {
-		note.scheduleId = Tone.Transport.scheduleOnce((contextTime) => this.playNote(note, contextTime), note.time);
-		this.noteQueue.push(note);
+	scheduleNote(note, toSave) {
+		// `toSave`: Boolean for whether the note should be saved to history and noteQueue
+		note.scheduleId = Tone.Transport.scheduleOnce((contextTime) => this.playNote(note, contextTime, toSave), note.time);
+		if (toSave) this.noteQueue.push(note);
 	}
 	
 	async callModel(scheduleImmediately=true) {
@@ -156,38 +157,46 @@ class Piano {
 		
 		// Start the window at an offset (i.e. half an interval) earlier so that notes are centered
 		const start = Math.max(this.callModelEnd - this.beatsToSeconds(this.historyWindowBeats), -this.getInterval() / 2);
+		const end = this.callModelEnd;
 		const history = History.getRecentHistory(this.currHistory.noteHistory, start);
 		const queued = History.getRecentHistory(this.noteQueue, start);
 		history.push(...queued);
 		
+		this.callModelEnd += this.beatsToSeconds(this.bufferBeats);
 		if (this.mode === PianoMode.Autoplay) {
 			const numRepeats = 3;
 			const selectionIdx = 1;
-			const generated = await this.model.generateNotes(history, start, this.callModelEnd, this.getInterval(), this.bufferBeats * this.ticksPerBeat, numRepeats, selectionIdx);
+			const generated = await this.model.generateNotes(history, start, end, this.getInterval(), this.bufferBeats * this.ticksPerBeat, numRepeats, selectionIdx);
 			
 			// Before scheduling notes, check that the model hasn't been restarted while this function was awaiting a response
 			if (this.modelStartTime !== null && initiatedTime >= this.modelStartTime) {
 				for (const gen of generated) {
 					const note = new Note(this.pianoKeys[gen.keyNum], gen.velocity, gen.duration, gen.time, Actor.Model);
 					if (scheduleImmediately) {
-						this.scheduleNote(note);
+						this.scheduleNote(note, true);
 					} else {
 						this.noteBuffer.push(note);
 					}
 				}
-				this.callModelEnd += this.beatsToSeconds(this.bufferBeats);
 			}
 		} else if (this.mode === PianoMode.Composer) {
 			const numRepeats = 7;
 			const selectionIdx = -1;
-			const options = await this.model.generateNotes(history, start, this.callModelEnd, this.getInterval(), this.bufferBeats * this.ticksPerBeat, numRepeats, selectionIdx);
-			this.createOptions(options);
+			const options = await this.model.generateNotes(history, start, end, this.getInterval(), this.bufferBeats * this.ticksPerBeat, numRepeats, selectionIdx);
+			
+			const lastNoteTime = history.at(-1).time;
+			if (Tone.Transport.seconds >= lastNoteTime) {
+				this.createOptions(options);
+			} else {
+				this.optionsScheduleId = Tone.Transport.scheduleOnce(() => this.createOptions(options), lastNoteTime);
+			}
 		}
 	}
 	
 	createOptions(options) {
 		const optionsContainer = document.getElementById('composeOptionsContainer');
 		optionsContainer.style.display = 'block';
+		optionsContainer.replaceChildren(); // Remove previous options
 		
 		for (let i = 0; i < options.length; i++) {
 			const option = options[i];
@@ -216,7 +225,7 @@ class Piano {
 			
 			const playButton = document.createElement('button');
 			playButton.classList.add('menuButton');
-			playButton.addEventListener('click', () => this.optionSelected(optionHistory.noteHistory, this.callModelEnd));
+			playButton.addEventListener('click', () => this.playOption(optionHistory.noteHistory, false, false));
 			optionsTextContainer.appendChild(playButton);
 			
 			const playButtonShape = document.createElement('div');
@@ -225,11 +234,12 @@ class Piano {
 			playButton.appendChild(playButtonShape);
 			const playButtonTooltip = document.createElement('div');
 			playButtonTooltip.classList.add('composeButtonTooltip');
-			playButtonTooltip.textContent = 'Play';
+			playButtonTooltip.textContent = 'Listen';
 			playButton.appendChild(playButtonTooltip);
 			
 			const rewindButton = document.createElement('button');
 			rewindButton.classList.add('menuButton');
+			rewindButton.addEventListener('click', () => this.playOption(optionHistory.noteHistory, false, true));
 			optionsTextContainer.appendChild(rewindButton);
 			
 			const rewindButtonShape = document.createElement('div');
@@ -238,11 +248,12 @@ class Piano {
 			rewindButton.appendChild(rewindButtonShape);
 			const rewindButtonTooltip = document.createElement('div');
 			rewindButtonTooltip.classList.add('composeButtonTooltip');
-			rewindButtonTooltip.textContent = 'Rewind & Play';
+			rewindButtonTooltip.textContent = 'Rewind & Listen';
 			rewindButton.appendChild(rewindButtonTooltip);
 			
 			const selectButton = document.createElement('button');
 			selectButton.classList.add('menuButton');
+			selectButton.addEventListener('click', () => this.playOption(optionHistory.noteHistory, true, false));
 			optionsTextContainer.appendChild(selectButton);
 			
 			const selectButtonShape = document.createElement('div');
@@ -256,12 +267,50 @@ class Piano {
 		}
 	}
 	
-	optionSelected(notes, start) {
+	playOption(notes, isSelected, isRewind) {
+		/*
+			`notes`: noteHistory array
+			`isSelected`: if the option was selected or just listening to it
+			`isRewind`: if rewinding to past history before playing this option
+		*/
+		
 		Tone.Transport.cancel();
+		this.lastActivity = new Date();
+		if (this.listeningToOption) this.clearScreen(); // Clear the screen of previous option's notes
+		
+		if (isRewind) {
+			const rewindSeconds = this.beatsToSeconds(4);
+			const rewindTime = this.callModelEnd - rewindSeconds - this.beatsToSeconds(this.bufferBeats); // Subtract bufferBeats because callModel already added it on
+			const historyNotes = History.getRecentHistory(this.currHistory.noteHistory, rewindTime);
+			const rewindNotes = Array.from(historyNotes, (note) => new Note(note.key, note.velocity, note.duration, note.time, note.actor, null, true));
+			
+			if (rewindNotes.length > 0) {
+				Tone.Transport.seconds = rewindNotes[0].time - (this.getInterval() / 2);
+				notes = rewindNotes.concat(notes);
+			}
+		}
+		
 		Tone.Transport.seconds = notes[0].time - (this.getInterval() / 2);
 		for (const note of notes) {
-			this.scheduleNote(note);
+			this.scheduleNote(note, isSelected);
 		}
+		
+		this.listeningToOption = !isSelected;
+		if (isSelected) {
+			this.hideOptions();
+			this.callModel();
+		}
+	}
+	
+	hideOptions() {
+		const optionsContainer = document.getElementById('composeOptionsContainer');
+		optionsContainer.replaceChildren(); // Remove previous options
+		optionsContainer.style.display = 'none';
+	}
+	
+	clearScreen() {
+		this.activeNotes = [];
+		if (this.notesCanvas) this.notesCanvas.activeBars = [];
 	}
 	
 	checkActivity() {
@@ -292,17 +341,9 @@ class Piano {
 		Tone.Transport.scheduleOnce(() => this.startModel(startGlowDelay), Math.max(0, this.callModelEnd - this.beatsToSeconds(this.bufferBeats)));
 	}
 	
-	clearOptions() {
-		const optionsContainer = document.getElementById('composeOptionsContainer');
-		const canvasesToRemove = optionsContainer.querySelectorAll('canvas');
-		for (const canvas of canvasesToRemove) {
-			canvas.parentNode.removeChild(canvas);
-		};
-		optionsContainer.style.display = 'none';
-	}
-	
 	stopModel() {
 		this.notesCanvas.endGlow();
+		Tone.Transport.clear(this.optionsScheduleId);
 		for (const note of this.noteQueue) {
 			Tone.Transport.clear(note.scheduleId);
 		}
@@ -321,7 +362,7 @@ class Piano {
 	resetAll() {
 		this.releaseAllNotes();
 		this.stopModel();
-		this.clearOptions();
+		this.hideOptions();
 		Tone.Transport.cancel();
 		Tone.Transport.stop();
 		
@@ -329,6 +370,7 @@ class Piano {
 		this.currHistory = null;
 		this.activeNotes = [];
 		this.pianoAudio.toneStarted = false;
+		this.listeningToOption = false;
 		NProgress.done();
 		
 		if (typeof this.listenerIntervalId !== 'undefined') {
@@ -387,9 +429,11 @@ class Piano {
 				// Rewind the transport schedule to the last of the seed input so that the history fed to the model is seamless
 				// Subtract buffer seconds since callModel() adds it to callModelEnd
 				Tone.Transport.seconds = this.callModelEnd - this.beatsToSeconds(this.bufferBeats);
-				Array.from(this.noteBuffer, (note) => this.scheduleNote(note));
-				this.noteBuffer = [];
-				this.startModel(0);
+				if (this.mode === PianoMode.Autoplay) {
+					Array.from(this.noteBuffer, (note) => this.scheduleNote(note, true));
+					this.noteBuffer = [];
+					this.startModel(0);
+				}
 				
 				// Hide the listening visual indicator and stop awaiter
 				this.awaitingInput = false;
@@ -412,7 +456,7 @@ class Piano {
 		const start = Tone.Transport.seconds;
 		const notes = PianolaModel.queryStringToNotes(data, start, this.getInterval());
 		for (const note of notes) {
-			this.scheduleNote(new Note(this.pianoKeys[note.keyNum], note.velocity, note.duration, note.time, Actor.Bot));
+			this.scheduleNote(new Note(this.pianoKeys[note.keyNum], note.velocity, note.duration, note.time, Actor.Bot), true);
 		}
 		this.currHistory.lastSeedNoteTime = notes.at(-1).time;
 		if (this.mode === PianoMode.Autoplay || this.mode === PianoMode.Composer) {
@@ -421,7 +465,7 @@ class Piano {
 	}
 	
 	rewind() {
-		if (!this.pianoAudio.toneStarted || this.awaitingInput || this.mode === PianoMode.Freeplay) return false;
+		if (!this.pianoAudio.toneStarted || this.awaitingInput || this.mode === PianoMode.Freeplay || this.mode === PianoMode.Composer) return false;
 		
 		// Copy queued notes before they are cleared; queue may be needed for replaying notes when rewinding
 		const queuedNotes = [...this.noteQueue];
@@ -452,7 +496,7 @@ class Piano {
 		
 		for (const note of replayNotes) {
 			const newNote = new Note(note.key, note.velocity, note.duration, note.time, note.actor, null, true);
-			this.scheduleNote(newNote);
+			this.scheduleNote(newNote, true);
 		}
 		
 		// Redraw notes
@@ -489,7 +533,7 @@ class Piano {
 		if (this.notesCanvas) this.notesCanvas.activeBars = [];
 		for (const note of history.noteHistory) {
 			const newNote = new Note(note.key, note.velocity, note.duration, note.time, note.actor, null, true);
-			this.scheduleNote(newNote);
+			this.scheduleNote(newNote, true);
 		}
 		
 		const lastNote = history.noteHistory.at(-1);
