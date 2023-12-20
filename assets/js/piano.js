@@ -217,7 +217,9 @@ class Piano {
 			
 			const pianoRoll = new PianoRoll(optionHistory);
 			optionElement.appendChild(pianoRoll.canvas);
-			pianoRoll.draw();
+			const optionStartTime = this.callModelEnd - this.beatsToSeconds(this.bufferBeats);
+			const optionDuration = this.beatsToSeconds(this.bufferBeats);
+			pianoRoll.draw(optionStartTime, optionDuration);
 			
 			const optionsTextContainer = document.createElement('div');
 			optionsTextContainer.classList.add('composeOptionsTextContainer');
