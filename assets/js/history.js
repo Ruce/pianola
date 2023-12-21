@@ -37,6 +37,16 @@ class History {
 		return [];
 	}
 	
+	static getEndTime(noteHistory) {
+		// Get the time when all notes have been released, which is not necessarily the last note if an earlier note was held down
+		let endTime = 0;
+		for (const note of noteHistory) {
+			const noteEnd = note.duration > 0 ? note.time + note.duration : note.time;
+			endTime = Math.max(endTime, noteEnd);
+		}
+		return endTime;
+	}
+	
 	add(note) {
 		if (!note.isRewind) this.isNew = true;
 		

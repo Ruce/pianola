@@ -35,8 +35,9 @@ class PianoRoll {
 		ctx.roundRect(0, 0, this.canvas.width, this.canvas.height, canvasPadding);
 		ctx.fill();
 		
+		if (this.history.noteHistory.length === 0) return;
 		// Get the most recent range of notes to be drawn
-		const histEndY = (this.history.noteHistory.at(-1).time + this.history.noteHistory.at(-1).duration - startTime) * noteHeight;
+		const histEndY = (History.getEndTime(this.history.noteHistory) - startTime) * noteHeight;
 		const histStartY = Math.max(histEndY - this.canvas.height + canvasPadding, -canvasPadding);
 		
 		for (const note of this.history.noteHistory) {

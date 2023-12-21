@@ -26,6 +26,7 @@ class Piano {
 		this.activeNotes = [];
 		this.noteQueue = [];
 		this.noteBuffer = [];
+		this.keysDown = [];
 		
 		// Sync `this.contextDateTime` with AudioContext time on a regular interval
 		setInterval(() => this.updateContextDateTime(), 1000);
@@ -63,8 +64,11 @@ class Piano {
 		if (event.repeat) return;
 		if (event.altKey || event.ctrlKey || event.shiftKey) return;
 		if (event.target.classList.contains('historyTitle')) return;
+		if (this.keysDown.includes(event.key.toLowerCase())) return; // Key has not yet been released (i.e. no keyUp event), but somehow keyDown is triggered (e.g. if two keys were pressed and one was released)
 		
 		this.lastActivity = new Date();
+		this.keysDown.push(event.key.toLowerCase());
+		
 		switch (event.key) {
 			case ' ':
 				this.resetAll();
@@ -89,6 +93,9 @@ class Piano {
 	
 	keyUp(event) {
 		this.lastActivity = new Date();
+		const keyIdx = this.keysDown.indexOf(event.key.toLowerCase());
+		if (keyIdx > -1) this.keysDown.splice(keyIdx, 1);
+		
 		const keyNum = this.keyMap[event.key.toLowerCase()];
 		if (keyNum !== undefined) {
 			this.releaseNote(this.pianoKeys[keyNum]);
@@ -184,7 +191,7 @@ class Piano {
 			const selectionIdx = -1;
 			const options = await this.model.generateNotes(history, start, end, this.getInterval(), this.bufferBeats * this.ticksPerBeat, numRepeats, selectionIdx);
 			
-			const lastNoteTime = history.at(-1).time;
+			const lastNoteTime = History.getEndTime(history);
 			if (Tone.Transport.seconds >= lastNoteTime) {
 				this.createOptions(options);
 			} else {
@@ -218,7 +225,7 @@ class Piano {
 			const pianoRoll = new PianoRoll(optionHistory);
 			optionElement.appendChild(pianoRoll.canvas);
 			const optionStartTime = this.callModelEnd - this.beatsToSeconds(this.bufferBeats);
-			const optionDuration = this.beatsToSeconds(this.bufferBeats);
+			const optionDuration = this.beatsToSeconds(this.bufferBeats + 1); // Add an extra beat to pad duration for held down notes
 			pianoRoll.draw(optionStartTime, optionDuration);
 			
 			const optionsTextContainer = document.createElement('div');
@@ -267,6 +274,17 @@ class Piano {
 			selectButtonTooltip.textContent = 'Select';
 			selectButton.appendChild(selectButtonTooltip);
 		}
+		
+		const reloadButton = document.createElement('button');
+		reloadButton.classList.add('composeReloadButton');
+		reloadButton.textContent = '\u{021BA}';
+		reloadButton.addEventListener('click', () => this.reloadOptions());
+		optionsContainer.appendChild(reloadButton);
+		
+		const reloadButtonTooltip = document.createElement('div');
+		reloadButtonTooltip.classList.add('composeButtonTooltip');
+		reloadButtonTooltip.textContent = 'Regenerate';
+		reloadButton.appendChild(reloadButtonTooltip);
 	}
 	
 	playOption(notes, isSelected, isRewind) {
@@ -285,11 +303,7 @@ class Piano {
 			const rewindTime = this.callModelEnd - rewindSeconds - this.beatsToSeconds(this.bufferBeats); // Subtract bufferBeats because callModel already added it on
 			const historyNotes = History.getRecentHistory(this.currHistory.noteHistory, rewindTime);
 			const rewindNotes = Array.from(historyNotes, (note) => new Note(note.key, note.velocity, note.duration, note.time, note.actor, null, true));
-			
-			if (rewindNotes.length > 0) {
-				Tone.Transport.seconds = rewindNotes[0].time - (this.getInterval() / 2);
-				notes = rewindNotes.concat(notes);
-			}
+			if (rewindNotes.length > 0) notes = rewindNotes.concat(notes);
 		}
 		
 		Tone.Transport.seconds = notes[0].time - (this.getInterval() / 2);
@@ -308,6 +322,19 @@ class Piano {
 		const optionsContainer = document.getElementById('composeOptionsContainer');
 		optionsContainer.replaceChildren(); // Remove previous options
 		optionsContainer.style.display = 'none';
+	}
+	
+	reloadOptions() {
+		const optionsContainer = document.getElementById('composeOptionsContainer');
+		optionsContainer.style.display = 'block';
+		optionsContainer.replaceChildren(); // Remove previous options
+		
+		const loaderCircle = document.createElement('div');
+		loaderCircle.classList.add('loaderCircle');
+		optionsContainer.appendChild(loaderCircle);
+		
+		this.callModelEnd -= this.beatsToSeconds(this.bufferBeats); // Subtract bufferBeats to get back to the previous callModelEnd
+		this.callModel();
 	}
 	
 	clearScreen() {

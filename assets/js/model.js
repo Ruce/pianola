@@ -77,7 +77,13 @@ class PianolaModel {
 			`interval`: length (in seconds) of a tick interval
 		*/
 		
-		const numSixteenthNotes = Math.ceil((end - start) / interval);
+		function ceilWithPrecision(num, precision) {
+			const magnitude = Math.pow(10, precision);
+			const truncatedNum = Math.ceil(num * magnitude) / magnitude;
+			return truncatedNum;
+		}
+		
+		const numSixteenthNotes = ceilWithPrecision((end - start) / interval, 8);
 		const orderedNotes = Array.from({ length: numSixteenthNotes }, () => []);
 
 		for (const n of noteHistory) {

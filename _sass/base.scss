@@ -436,6 +436,26 @@ input[type="text"], textarea {
 	display: block;
 }
 
+.composeReloadButton {
+	position: absolute;
+	margin-left: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 32px;
+	border: none;
+	background: none;
+	color: $whiteColor;
+	cursor: pointer;
+}
+
+.composeReloadButton:hover {
+	color: grey;
+}
+
+.composeReloadButton:hover > .composeButtonTooltip {
+	display: block;
+}
+
 .menuContainer {
 	position: absolute;
 	top: 10px;
