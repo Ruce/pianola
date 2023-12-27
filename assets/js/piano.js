@@ -227,11 +227,11 @@ class Piano {
 			optionTitle.textContent = `Option ${i+1}`;
 			optionElement.appendChild(optionTitle);
 			
-			const pianoRoll = new PianoRoll(optionHistory);
-			optionElement.appendChild(pianoRoll.canvas);
 			const optionStartTime = this.callModelEnd - this.beatsToSeconds(this.bufferBeats);
 			const optionDuration = this.beatsToSeconds(this.bufferBeats + 1); // Add an extra beat to pad duration for held down notes
-			pianoRoll.draw(optionStartTime, optionDuration);
+			const pianoRoll = new PianoRoll(optionHistory, optionStartTime, optionDuration);
+			optionElement.appendChild(pianoRoll.canvas);
+			pianoRoll.draw();
 			
 			const optionsTextContainer = document.createElement('div');
 			optionsTextContainer.classList.add('composeOptionsTextContainer');
