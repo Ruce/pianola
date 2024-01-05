@@ -3,6 +3,7 @@ class PianoAudio {
 		this.bpm = bpm;
 		this.sampler = this.initialiseSampler(pianoKeys);
 		this.toneStarted = false;
+		this.transportStarted = false;
 	}
 	
 	static circVar(samples, high=1, low=0) {
@@ -78,14 +79,20 @@ class PianoAudio {
 		const volumeDb = (volume < 1) ? -Infinity : -(40 - (volume/3));
 		this.sampler.volume.value = volumeDb;
 	}
-
-	startTone() {
-		// Returns true if Tone was just started, otherwise returns false (i.e. if Tone had already been started)
-		if (!this.toneStarted) { 
-			Tone.start().then(() => {
-				Tone.Transport.start();
-			});
+	
+	async startTone() {
+		if (!this.toneStarted) {
+			await Tone.start();
 			this.toneStarted = true;
+			return true;
+		}
+	}
+	
+	startTransport() {
+		// Returns true if Transport was just started, otherwise returns false (i.e. if Transport had already been started)
+		if (!this.transportStarted) { 
+			Tone.Transport.start();
+			this.transportStarted = true;
 			return true;
 		} else {
 			return false;

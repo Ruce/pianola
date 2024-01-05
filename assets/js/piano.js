@@ -14,10 +14,11 @@ class Piano {
 		this.keyMapShift = 9;
 		this.keyMap = PianoKeyMap.getKeyMap(this.keyMapShift, this.pianoKeys.length);
 		this.pianoCanvas = new PianoCanvas(this, canvasId);
-		this.pianoAudio = new PianoAudio(this.defaultBPM, this.pianoKeys)
+		this.pianoAudio = new PianoAudio(this.defaultBPM, this.pianoKeys);
 		this.model = model;
 		this.historyController = historyController;
 		this.mode = PianoMode.Composer;
+		this.initialiseMidi();
 		
 		this.lastActivity = new Date();
 		this.modelStartTime = null;
@@ -50,14 +51,16 @@ class Piano {
 		return time - remainder + interval;
 	}
 	
-	keyPressed(keyNum) {
-		if (this.pianoAudio.startTone()) {
+	keyPressed(keyNum, velocity=0.8) {
+		if (!this.pianoAudio.toneStarted) return;
+		
+		if (this.pianoAudio.startTransport()) {
 			this.startHistory();
 			if (this.mode === PianoMode.Composer || this.mode === PianoMode.Autoplay) {
 				this.seedInputListener();
 			}
 		}
-		this.playNote(new Note(this.pianoKeys[keyNum], 0.8, -1, Tone.Transport.seconds, Actor.Player));
+		this.playNote(new Note(this.pianoKeys[keyNum], velocity, -1, Tone.Transport.seconds, Actor.Player));
 		this.lastActivity = new Date();
 	}
 	
@@ -404,7 +407,7 @@ class Piano {
 		this.historyController.addToHistoryList(this.currHistory, this);
 		this.currHistory = null;
 		this.activeNotes = [];
-		this.pianoAudio.toneStarted = false;
+		this.pianoAudio.transportStarted = false;
 		this.listeningToOption = false;
 		NProgress.done();
 		
@@ -484,7 +487,7 @@ class Piano {
 	playExample(data, bpm, title) {
 		this.resetAll();
 		this.pianoAudio.setBPM(bpm);
-		this.pianoAudio.startTone();
+		this.pianoAudio.startTransport();
 		this.lastActivity = new Date();
 		this.currHistory = new History(this.pianoAudio.bpm, title);
 		
@@ -500,7 +503,7 @@ class Piano {
 	}
 	
 	rewind() {
-		if (!this.pianoAudio.toneStarted || this.awaitingInput || this.mode === PianoMode.Freeplay) return false;
+		if (!this.pianoAudio.transportStarted || this.awaitingInput || this.mode === PianoMode.Freeplay) return false;
 		this.lastActivity = new Date();
 		
 		if (this.mode === PianoMode.Composer) {
@@ -580,7 +583,7 @@ class Piano {
 		this.currHistory.lastSeedNoteTime = history.noteHistory.at(-1).time;
 		this.currHistory.parentHistory = history;
 		this.pianoAudio.setBPM(history.bpm);
-		this.pianoAudio.startTone();
+		this.pianoAudio.startTransport();
 		
 		if (this.notesCanvas) this.notesCanvas.activeBars = [];
 		for (const note of history.noteHistory) {
@@ -645,5 +648,59 @@ class Piano {
 	updateContextDateTime() {
 		this.contextDateTime = new Date();
 		this.contextDateTime.setMilliseconds(this.contextDateTime.getMilliseconds() - (Tone.context.currentTime * 1000));
+	}
+	
+	initialiseMidi() {
+		this.midiAccess = null;
+		navigator.requestMIDIAccess().then((access) => {
+			this.midiAccess = access;
+			this.attachMidiListener(this.midiAccess);
+			
+			// If a new midi port is connected, attach the listener
+			this.midiAccess.onstatechange = (event) => {
+				if (event.port.type === 'input' && event.port.state === 'connected') {
+					this.attachMidiListener(this.midiAccess);
+				}
+			}
+		});
+	}
+	
+	attachMidiListener(midiAccess) {
+		midiAccess.inputs.forEach((input) => {
+			if (!input.onmidimessage) {
+				input.onmidimessage = (message) => {
+					this.onMidiMessage(message);
+				};
+			}
+		});
+	}
+	
+	onMidiMessage(message) {
+		const data = message.data;
+		
+		// Only supports input on channel 0
+		if (data && data.length === 3) {
+			const status = data[0];
+			if (status === 144) {
+				// Note on message
+				const midiNoteNum = data[1];
+				const velocity = data[2] / 100;
+				
+				const keyNum = midiNoteNum - PianoKey.calcLowestMidiNote(this.octaves);
+				if (keyNum >= 0 && keyNum < this.pianoKeys.length) {
+					this.keyPressed(keyNum, velocity);
+				}
+			}
+			else if (status === 128) {
+				// Note off message
+				const midiNoteNum = data[1];
+				
+				const keyNum = midiNoteNum - PianoKey.calcLowestMidiNote(this.octaves);
+				if (keyNum >= 0 && keyNum < this.pianoKeys.length) {
+					this.releaseNote(this.pianoKeys[keyNum]);
+				}
+			}
+			
+		}
 	}
 }

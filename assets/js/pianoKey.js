@@ -80,9 +80,13 @@ class PianoKey {
 		return PianoKey.noteNames[index] + pitchOctave;
 	}
 	
+	static calcLowestMidiNote(octaves) {
+		return PianoKey.midiNoteNumMiddleC - (Math.floor(octaves / 2) * 12) - 3; // Calculate lowest note from middle C
+	}
+	
 	static createPianoKeys(octaves) {
 		const numKeys = (7 * octaves + 3) + (5 * octaves + 1); // White keys + black keys, and extra keys outside of main octaves
-		const lowestMidiNote = PianoKey.midiNoteNumMiddleC - (Math.floor(octaves / 2) * 12) - 3; // Calculate lowest note from middle C
+		const lowestMidiNote = PianoKey.calcLowestMidiNote(octaves);
 		const pianoKeys = [];
 		for (let i = 0; i < numKeys; i++) {
 			pianoKeys.push(new PianoKey(i, lowestMidiNote + i));

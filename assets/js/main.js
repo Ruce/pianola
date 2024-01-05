@@ -195,14 +195,20 @@ function openIntro() {
 	document.getElementById('introShared').style.display = 'none';
 }
 
-function closeIntro() {
-    // Close the overlay if there isn't a shared history waiting to be played
-	if (!piano.sharedHistory) {
-		document.getElementById('introOverlay').style.display = 'none';
-	}
+async function closeIntro() {
+	// Ignore clicks on overlay if shared history is waiting to be played
+	if (piano.sharedHistory) return;
+
+	// As an entry point into the app, trigger AudioContext start
+	await piano.pianoAudio.startTone();
+
+	document.getElementById('introOverlay').style.display = 'none';
 }
 
-function playShared() {
+async function playShared() {
+	// As an entry point into the app, trigger AudioContext start
+	await piano.pianoAudio.startTone();
+	
 	piano.playSharedHistory();
 	closeIntro();
 }
