@@ -30,8 +30,6 @@ class Piano {
 		this.noteBuffer = [];
 		this.keysDown = [];
 		
-		// Sync `this.contextDateTime` with AudioContext time on a regular interval
-		setInterval(() => this.updateContextDateTime(), 1000);
 	}
 	
 	beatsToSeconds(beats) {
@@ -122,7 +120,7 @@ class Piano {
 		if (toSave) this.currHistory.add(note);
 		
 		// Draw note on canvases
-		const startTime = new Date(this.contextDateTime);
+		const startTime = new Date(this.pianoAudio.contextDateTime);
 		startTime.setMilliseconds(startTime.getMilliseconds() + (contextTime * 1000));
 		this.pianoCanvas.triggerDraw();
 		this.notesCanvas.addNoteBar(note.key, startTime, note.duration, this.pianoAudio.bpm, note.actor, note.isRewind);
@@ -643,11 +641,6 @@ class Piano {
 	
 	bindNotesCanvas(notesCanvas) {
 		this.notesCanvas = notesCanvas;
-	}
-	
-	updateContextDateTime() {
-		this.contextDateTime = new Date();
-		this.contextDateTime.setMilliseconds(this.contextDateTime.getMilliseconds() - (Tone.context.currentTime * 1000));
 	}
 	
 	initialiseMidi() {

@@ -4,6 +4,9 @@ class PianoAudio {
 		this.sampler = this.initialiseSampler(pianoKeys);
 		this.toneStarted = false;
 		this.transportStarted = false;
+		
+		// Sync `this.contextDateTime` with AudioContext time on a regular interval
+		setInterval(() => this.updateContextDateTime(), 1000);
 	}
 	
 	static circVar(samples, high=1, low=0) {
@@ -84,6 +87,7 @@ class PianoAudio {
 		if (!this.toneStarted) {
 			await Tone.start();
 			this.toneStarted = true;
+			this.updateContextDateTime();
 			return true;
 		}
 	}
@@ -97,5 +101,10 @@ class PianoAudio {
 		} else {
 			return false;
 		}
+	}
+	
+	updateContextDateTime() {
+		this.contextDateTime = new Date();
+		this.contextDateTime.setMilliseconds(this.contextDateTime.getMilliseconds() - (Tone.context.currentTime * 1000));
 	}
 }
