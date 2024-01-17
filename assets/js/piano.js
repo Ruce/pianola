@@ -251,11 +251,14 @@ class Piano {
 			const selectionIdx = -1;
 			const options = await this.model.generateNotes(history, start, end, this.getInterval(), this.bufferBeats * this.ticksPerBeat, numRepeats, selectionIdx);
 			
-			const lastNoteTime = History.getEndTime(history);
-			if (Tone.Transport.seconds >= lastNoteTime || !scheduleInTime) {
-				this.createOptions(options);
-			} else {
-				this.optionsScheduleId = Tone.Transport.scheduleOnce(() => this.createOptions(options), lastNoteTime);
+			// Before scheduling notes, check that the model hasn't been restarted while this function was awaiting a response
+			if (this.modelStartTime !== null && initiatedTime >= this.modelStartTime) {
+				const lastNoteTime = History.getEndTime(history);
+				if (Tone.Transport.seconds >= lastNoteTime || !scheduleInTime) {
+					this.createOptions(options);
+				} else {
+					this.optionsScheduleId = Tone.Transport.scheduleOnce(() => this.createOptions(options), lastNoteTime);
+				}
 			}
 		}
 	}
