@@ -151,6 +151,14 @@ class Piano {
 		}
 	}
 	
+	touchChangeSustain(event) {
+		if (event.type === 'touchstart') {
+			this.pressSustain();
+		} else if (event.type === 'touchend' || event.type === 'touchcancel') {
+			this.releaseSustain();
+		}
+	}
+	
 	playNote(note, contextTime=Tone.getContext().currentTime, toSave=true) {
 		// Check if pianoKey is already active, i.e. note is played again while currently held down, and if so release it
 		this.releaseNote(note.key, note.time);

@@ -143,6 +143,9 @@ function initialiseSustainPedal() {
 	pedalMark.addEventListener('mousedown', () => piano.pressSustain());
 	pedalMark.addEventListener('mouseup', () => piano.releaseSustain());
 	pedalMark.addEventListener('mouseout', () => piano.releaseSustain());
+	pedalMark.addEventListener('touchstart', (event) => piano.touchChangeSustain(event));
+	pedalMark.addEventListener('touchend', (event) => piano.touchChangeSustain(event));
+	pedalMark.addEventListener('touchcancel', (event) => piano.touchChangeSustain(event));
 }
 
 async function loadHistory() {
