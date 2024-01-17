@@ -426,16 +426,17 @@ def generate_options(model, seed, timesteps, timesteps_per_chunk, base_num_repea
     generated, prob_masses, past_key_values = generate_music(model, seed, base_timesteps, base_num_repeats, selection_idx=-1)
     
     ## Get 3 options:
-    # 1. Lowest duration
-    # 2. Lowest probability mass (most chaotic)
-    # 3. Highest probability mass (most stable)
+    # 1. Highest probability mass (most stable)
+    # 2. Lower probability mass (more chaotic)
+    # 3. Lowest duration
 
     durations = torch.tensor([(sample[..., 1] > 0).sum() for sample in generated])
     duration_idx = durations.argsort()[0]
 
     prob_mass_indices = prob_masses.argsort().tolist()
     prob_mass_indices.remove(duration_idx)
-    low_prob_idx = prob_mass_indices[0] if len(prob_mass_indices) > 0 else duration_idx
+    midpoint = len(prob_mass_indices) // 2
+    low_prob_idx = prob_mass_indices[midpoint] if len(prob_mass_indices) > 0 else duration_idx
     high_prob_idx = prob_mass_indices[-1] if len(prob_mass_indices) > 0 else duration_idx
 
     duration_gen = generated[duration_idx]
@@ -454,7 +455,8 @@ def generate_options(model, seed, timesteps, timesteps_per_chunk, base_num_repea
                 case 'duration':
                     option_idx = new_durations.argsort()[0]
                 case 'low_prob':
-                    option_idx = new_prob_masses.argsort()[0]
+                    midpoint = len(new_prob_masses) // 2
+                    option_idx = new_prob_masses.argsort()[midpoint]
                 case 'high_prob':
                     option_idx = new_prob_masses.argsort()[-1]
                 case _:
@@ -464,10 +466,10 @@ def generate_options(model, seed, timesteps, timesteps_per_chunk, base_num_repea
             pkv = select_pkv(new_pkv, option_idx)
         return option_generated
 
-    duration_gen = generate_branched_option(duration_gen, 'duration', select_pkv(past_key_values, duration_idx))
-    low_prob_gen = generate_branched_option(low_prob_gen, 'low_prob', select_pkv(past_key_values, low_prob_idx))
     high_prob_gen = generate_branched_option(high_prob_gen, 'high_prob', select_pkv(past_key_values, high_prob_idx))
-    return duration_gen, low_prob_gen, high_prob_gen
+    low_prob_gen = generate_branched_option(low_prob_gen, 'low_prob', select_pkv(past_key_values, low_prob_idx))
+    duration_gen = generate_branched_option(duration_gen, 'duration', select_pkv(past_key_values, duration_idx))
+    return high_prob_gen, low_prob_gen, duration_gen
 
 # Define model and load weights
 def model_fn(model_dir):
