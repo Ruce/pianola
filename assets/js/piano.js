@@ -29,6 +29,8 @@ class Piano {
 		this.noteQueue = [];
 		this.noteBuffer = [];
 		this.keysDown = [];
+		this.pianoKeysDown = [];
+		this.sustain = false;
 		
 	}
 	
@@ -49,27 +51,14 @@ class Piano {
 		return time - remainder + interval;
 	}
 	
-	keyPressed(keyNum, velocity=0.8) {
-		if (!this.pianoAudio.toneStarted) return;
-		
-		if (this.pianoAudio.startTransport()) {
-			this.startHistory();
-			if (this.mode === PianoMode.Composer || this.mode === PianoMode.Autoplay) {
-				this.seedInputListener();
-			}
-		}
-		this.playNote(new Note(this.pianoKeys[keyNum], velocity, -1, Tone.Transport.seconds, Actor.Player));
-		this.lastActivity = new Date();
-	}
-	
 	keyDown(event) {
 		if (event.repeat) return;
-		if (event.altKey || event.ctrlKey || event.shiftKey) return;
+		if (event.altKey || event.ctrlKey) return;
 		if (event.target.classList.contains('historyTitle')) return;
-		if (this.keysDown.includes(event.key.toLowerCase())) return; // Key has not yet been released (i.e. no keyUp event), but somehow keyDown is triggered (e.g. if two keys were pressed and one was released)
-		
+		if (this.keysDown.includes(event.code)) return; // Key has not yet been released (i.e. no keyUp event), but somehow keyDown is triggered (e.g. if two keys were pressed and one was released)
+	
 		this.lastActivity = new Date();
-		this.keysDown.push(event.key.toLowerCase());
+		this.keysDown.push(event.code);
 		
 		switch (event.key) {
 			case ' ':
@@ -85,22 +74,80 @@ class Piano {
 			case 'ArrowDown':
 				this.shiftKeyMap(false);
 				break;
+			case 'Shift':
+				this.pressSustain();
+				break;
 			default:
-				const keyNum = this.keyMap[event.key.toLowerCase()];
+				const keyChar = PianoKeyMap.codeKeyMap[event.code];
+				const keyNum = this.keyMap[keyChar];
 				if (keyNum !== undefined) {
-					this.keyPressed(keyNum);
+					this.pressKey(keyNum);
 				}
 		}
 	}
 	
 	keyUp(event) {
 		this.lastActivity = new Date();
-		const keyIdx = this.keysDown.indexOf(event.key.toLowerCase());
+		const keyIdx = this.keysDown.indexOf(event.code);
 		if (keyIdx > -1) this.keysDown.splice(keyIdx, 1);
 		
-		const keyNum = this.keyMap[event.key.toLowerCase()];
+		if (event.key === 'Shift') {
+			this.releaseSustain();
+			
+			// If both Shift keys are pressed, only the last released key will trigger a keyUp event, so we need to manually remove the other Shift key from `keysDown`
+			const otherShiftKey = event.code === 'ShiftLeft' ? 'ShiftRight' : 'ShiftLeft';
+			const otherShiftIdx = this.keysDown.indexOf(otherShiftKey);
+			if (otherShiftIdx > -1) this.keysDown.splice(otherShiftIdx, 1);
+			
+			return;
+		}
+		
+		const keyChar = PianoKeyMap.codeKeyMap[event.code];
+		const keyNum = this.keyMap[keyChar];
 		if (keyNum !== undefined) {
-			this.releaseNote(this.pianoKeys[keyNum]);
+			this.releaseKey(this.pianoKeys[keyNum]);
+		}
+	}
+	
+	pressKey(keyNum, velocity=0.8) {
+		if (!this.pianoAudio.toneStarted) return;
+		
+		if (this.pianoAudio.startTransport()) {
+			this.startHistory();
+			if (this.mode === PianoMode.Composer || this.mode === PianoMode.Autoplay) {
+				this.seedInputListener();
+			}
+		}
+		
+		const pianoKey = this.pianoKeys[keyNum];
+		this.playNote(new Note(pianoKey, velocity, -1, Tone.Transport.seconds, Actor.Player));
+		this.lastActivity = new Date();
+		
+		// There could be multiple copies of pianoKey in pianoKeysDown if the same key is pressed in different ways (e.g. keyboard + mouse)
+		// This is intended as we will remove one instance of pianoKey for each device that releases the key
+		this.pianoKeysDown.push(pianoKey);
+	}
+	
+	releaseKey(pianoKey) {
+		const pianoKeyIdx = this.pianoKeysDown.indexOf(pianoKey);
+		if (pianoKeyIdx > -1) this.pianoKeysDown.splice(pianoKeyIdx, 1);
+		
+		if (this.pianoKeysDown.includes(pianoKey) || this.sustain) return;
+		this.releaseNote(pianoKey);
+	}
+	
+	pressSustain() {
+		this.sustain = true;
+		document.getElementById('sustainPedalMark').classList.add('sustainPedalMarkPressed');
+	}
+	
+	releaseSustain() {
+		this.sustain = false;
+		document.getElementById('sustainPedalMark').classList.remove('sustainPedalMarkPressed');
+		
+		const activeNotes = [...this.activeNotes];
+		for (const note of activeNotes) {
+			if (!this.pianoKeysDown.includes(note.key)) this.releaseNote(note.key);
 		}
 	}
 	
@@ -111,7 +158,7 @@ class Piano {
 			// Note is being held down
 			this.pianoAudio.sampler.triggerAttack(note.key.keyName, contextTime, note.velocity);
 		} else {
-			const triggerDuration = note.duration + 0.15; // Add a short delay to the end of the sound (in seconds)
+			const triggerDuration = note.duration + 0.01; // Add a short delay to the end of the sound (in seconds)
 			this.pianoAudio.sampler.triggerAttackRelease(note.key.keyName, triggerDuration, contextTime, note.velocity);
 		}
 		
@@ -139,7 +186,7 @@ class Piano {
 			// If note is scheduled to be released imminently, don't need to release it manually
 			const finalDuration = triggerTime - activeNote.time;
 			if (Math.abs(activeNote.duration - finalDuration) > 0.001) {
-				this.pianoAudio.sampler.triggerRelease(pianoKey.keyName, Tone.now() + 0.1);
+				this.pianoAudio.sampler.triggerRelease(pianoKey.keyName, Tone.now() + 0.01);
 				
 				// Update activeNote's final duration, which is also recorded in `noteHistory`
 				activeNote.duration = finalDuration;
@@ -681,19 +728,28 @@ class Piano {
 				
 				const keyNum = midiNoteNum - PianoKey.calcLowestMidiNote(this.octaves);
 				if (keyNum >= 0 && keyNum < this.pianoKeys.length) {
-					this.keyPressed(keyNum, velocity);
+					this.pressKey(keyNum, velocity);
 				}
-			}
-			else if (status === 128) {
+			} else if (status === 128) {
 				// Note off message
 				const midiNoteNum = data[1];
 				
 				const keyNum = midiNoteNum - PianoKey.calcLowestMidiNote(this.octaves);
 				if (keyNum >= 0 && keyNum < this.pianoKeys.length) {
-					this.releaseNote(this.pianoKeys[keyNum]);
+					this.releaseKey(this.pianoKeys[keyNum]);
+				}
+			} else if (status === 176) {
+				// Control change
+				const controller = data[1];
+				if (controller === 64) {
+					// Sustain pedal
+					if (data[2] > 0) {
+						this.pressSustain();
+					} else {
+						this.releaseSustain();
+					}
 				}
 			}
-			
 		}
 	}
 }

@@ -37,6 +37,7 @@ function initialisePage() {
 	initialiseVolumeSlider();
 	initialiseSeeds();
 	initialiseRewindReceiver();
+	initialiseSustainPedal();
 	closeMode(false); // Sets the mode radio button to the default in `piano`
 	
 	const historyPromise = loadHistory();
@@ -135,6 +136,13 @@ function initialiseRewindReceiver() {
 		}
 	}
 	rewindReceiver.addEventListener('dblclick', () => rewindAnimated());
+}
+
+function initialiseSustainPedal() {
+	const pedalMark = document.getElementById('sustainPedalMark');
+	pedalMark.addEventListener('mousedown', () => piano.pressSustain());
+	pedalMark.addEventListener('mouseup', () => piano.releaseSustain());
+	pedalMark.addEventListener('mouseout', () => piano.releaseSustain());
 }
 
 async function loadHistory() {

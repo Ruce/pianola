@@ -129,7 +129,7 @@ class PianoCanvas {
 	mouseDownKeyboard(event) {
 		globalMouseDown = true;
 		const clickedKeyNum = this.getKeyNumByCoord(event.clientX, event.clientY);
-		this.piano.keyPressed(clickedKeyNum);
+		this.piano.pressKey(clickedKeyNum);
 	}
 	
 	mouseMoveKeyboard(event) {
@@ -139,22 +139,22 @@ class PianoCanvas {
 			// Newly moused over key
 			this.triggerDraw();
 			if (globalMouseDown) {
-				this.piano.releaseNote(this.prevHoverKey);
-				this.piano.keyPressed(hoverKeyNum);
+				this.piano.releaseKey(this.prevHoverKey);
+				this.piano.pressKey(hoverKeyNum);
 			}
 			this.prevHoverKey = this.hoverKey;
 		}
 	}
 	
 	mouseUpKeyboard(event) {
-		this.piano.releaseNote(this.hoverKey);
+		this.piano.releaseKey(this.hoverKey);
 		this.triggerDraw();
 		this.piano.lastActivity = new Date();
 	}
 	
 	mouseOutKeyboard(event) {
 		if (globalMouseDown && this.hoverKey !== null) {
-			this.piano.releaseNote(this.hoverKey);
+			this.piano.releaseKey(this.hoverKey);
 			this.piano.lastActivity = new Date();
 		}
 		this.hoverKey = null;
@@ -177,12 +177,12 @@ class PianoCanvas {
 		const releasedKeys = this.touchedKeys.filter(x => !currTouchedKeys.includes(x));
 		
 		for (const k of newKeys) {
-			this.piano.keyPressed(k.keyNum);
+			this.piano.pressKey(k.keyNum);
 			this.touchedKeys.push(k);
 		}
 		
 		for (const k of releasedKeys) {
-			this.piano.releaseNote(k);
+			this.piano.releaseKey(k);
 			this.touchedKeys.splice(this.touchedKeys.indexOf(k), 1); // Remove key
 		}
 		

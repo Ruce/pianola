@@ -79,7 +79,7 @@ class PianoRoll {
 			const x = note.key.isWhiteKey? canvasPadding + note.key.colourKeyNum * noteWidth : canvasPadding + ((note.key.octave * noteWidth * 7) - (noteWidth * 5)) + PianoRoll.blackKeyX[(note.key.colourKeyNum - 1) % 5];
 			const y = (note.time - this.startTime) * noteHeight - histStartY;
 			const width = note.key.isWhiteKey? noteWidth - 1 : noteWidth - 2;
-			const height = note.duration * (noteHeight - 3);
+			const height = note.duration * noteHeight - 0.5;
 			
 			if (y + height < 0 || y > this.canvas.height) continue; // Skip notes that are off canvas
 			ctx.fillStyle = note.key.isWhiteKey ? NoteBar.fill[note.actor.name].white : NoteBar.fill[note.actor.name].black;
