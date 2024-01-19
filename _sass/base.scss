@@ -168,23 +168,23 @@ hr {
 .sustainPedalMark {
 	width: 45px;
 	height: 28.5px;
-	opacity: 25%;
+	opacity: 0.25;
 	background-image: url('../img/pedal-mark.svg');
 	background-size: cover;
 	user-select: none;
 }
 
 .sustainPedalMark:hover {
-	opacity: 50%;
+	opacity: 0.5;
 	cursor: pointer;
 }
 
 .sustainPedalMarkPressed {
-	opacity: 100%;
+	opacity: 1;
 }
 
 .sustainPedalMarkPressed:hover {
-	opacity: 100%;
+	opacity: 1;
 }
 
 #sustainPedalTooltip {
