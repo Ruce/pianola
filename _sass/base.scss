@@ -1,8 +1,12 @@
 $notesCanvasColor: #1D1D1D;
 $whiteColor: #FEFEFE;
 $menuBackgroundColor: #4D4D4D;
+$menuLightestColor: #9C9C9C;
+$menuLighterColor: #777;
 $menuLightColor: #646464;
 $menuDarkColor: #323232;
+$menuDarkerColor: #2B2B2B;
+$menuDarkestColor: #292929;
 $playerWhiteBarColor: #FDFD66;
 $playerBlackBarColor: #FFBF00;
 $modelWhiteBarColor: #BEFCFF;
@@ -41,15 +45,17 @@ hr {
 }
 
 ::-webkit-scrollbar {
-	width: 6px;
+	width: 5px;
+	margin-right: 1px;
 }
 
 ::-webkit-scrollbar-track {
-	background: #f1f1f1;
+	background: none;
 }
 
 ::-webkit-scrollbar-thumb {
-	background: #999;
+	background: $menuLighterColor;
+	border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -602,6 +608,11 @@ input[type="text"], textarea {
 	background-color: $whiteColor;
 }
 
+.seedButtonShape{
+	background-image: url('../img/music-note.svg');
+	background-size: cover;
+}
+
 .playButtonShape {
 	background-color: $whiteColor;
 	clip-path: polygon(0% 0%, 80% 50%, 0% 100%);
@@ -658,8 +669,8 @@ input[type="text"], textarea {
 	margin-top: -6px; /* Centers thumb on the track */
 }
 
-.modeButtonShape {
-	background-image: url('../img/music-note.svg');
+.settingsButtonShape {
+	background-image: url('../img/settings.svg');
 	background-size: cover;
 }
 
@@ -873,22 +884,22 @@ input[type="text"], textarea {
 	display: inline-block;
 	border: none;
 	color: white;
-	padding: 10px 30px;
+	padding: 9px 27px;
 	margin: 0 4px;
-	min-width: 120px;
-	border-radius: 4px;
+	min-width: 110px;
+	border-radius: 5px;
 	cursor: pointer;
-	font-size: 16px;
-	font-weight: bold;
+	font-size: 14px;
 	text-align: center;
 }
 
 .overlayButton:hover {
-	opacity: 0.9;
+	opacity: 0.8;
 }
 
 #introSharedPlay {
 	background: $modelBlackBarColor;
+	border: 1px solid $modelBlackBarColor;
 }
 
 #introFooter {
@@ -905,16 +916,10 @@ input[type="text"], textarea {
 	color: $modelWhiteBarColor;
 }
 
-#closeIntroButton {
+.closeButton {
 	position: absolute;
 	top: 12px;
 	right: 12px;
-}
-
-.closeButton {
-	position: absolute;
-	top: 0;
-	right: 0;
 	width: 30px;
 	height: 30px;
 	background: none;
@@ -944,37 +949,98 @@ input[type="text"], textarea {
 	transform: rotate(-45deg);
 }
 
-#modeOverlay {
+#settingsOverlay {
 	display: none;
 }
 
-#modeMenu {
+#settingsMenu {
 	position: absolute;
 	top: 50%;
 	left: 50%;
 	max-width: 640px;
 	transform: translate(-50%, -50%);
-	background: $menuDarkColor;
+	background: $menuDarkerColor;
 	color: white;
-	padding: 25px;
-	border: 1px solid;
-	border-color: $modelBlackBarColor;
+	padding: 20px 0;
+	border: 1px solid grey;
 	border-radius: 10px;
 	text-align: center;
+}
+
+.settingsContainer {
+	position: relative;
+	height: 294px;
+	padding: 0 20px;
+	overflow: hidden;
+	overflow-y: scroll;
+}
+
+.settingsBlock {
+	display: none;
+	position: absolute;
+	bottom: 20px;
+	left: 0;
+	width: 100%;
+	height: 294px;
+	opacity: 0.95;
+	background-color: $menuDarkColor;
+	z-index: 999;
+	justify-content: center;
+	align-items: center;
+}
+
+.settingsBlockText {
+	padding: 42px;
+}
+
+.settingsSubContainer {
+	margin: 20px 0;
+}
+
+.settingsSubContainer:first-child {
+	margin-top: 0;
+}
+
+.settingsHeader {
+	color: $modelBlackBarColor;
+	font-size: x-large;
+	margin: 10px 0;
+}
+
+.settingsSubHeader {
+	margin-bottom: 8px;
+	text-align: left;
+	font-size: 12px;
+	color: $menuLightestColor;
+}
+
+.textSettingsContainer {
+	display: flex;
+	margin: 12px 0;
+	font-size: 14px;
+	justify-content: space-between;
+}
+
+#modeSelectionForm {
+	margin: 0;
 }
 
 .modeOption {
 	display: inline-block;
 	position: relative;
 	vertical-align: top;
-	margin: 34px 8px;
+}
+
+.modeOption:not(:last-child) {
+	margin-right: 14px;
 }
 
 .modeBox {
-	width: 150px;
-	height: 92px;
+	width: 140px;
+	height: 88px;
 	padding: 10px 15px;
-	border: 1px solid $modelWhiteBarColor;
+	background-color: $menuDarkestColor;
+	border: 1px solid white;
 	border-radius: 5px;
 	text-align: left;
 	vertical-align: top;
@@ -982,15 +1048,17 @@ input[type="text"], textarea {
 }
 
 .modeOptionTitle {
+	font-size: 15px;
 	font-weight: bold;
 	color: $modelWhiteBarColor;
 }
 
 .modeOptionText {
-	font-size: small;
+	font-size: 12px;
 }
 
 .modeOption input[type="radio"] {
+	appearance: none;
 	position: absolute;
 	right: 13px;
 	top: 13px;
@@ -1006,11 +1074,131 @@ input[type="text"], textarea {
 }
 
 #modeCancel {
-	background: $menuLightColor;
+	background: $menuDarkestColor;
+	border: 1px solid white;
 }
 
 #modeSelect {
 	background: $modelBlackBarColor;
+	border: 1px solid $modelBlackBarColor;
+}
+
+.tempoSliderContainer {
+	display: flex;
+	align-items: center;
+}
+
+.tempoSlider {
+	display: inline-block;
+	margin: 0 12px;
+	width: 100%;
+	accent-color: $whiteColor;
+	cursor: pointer;
+}
+
+.tempoSlider::-webkit-slider-runnable-track {
+	height: 4px;
+}
+
+.tempoSlider::-webkit-slider-thumb {
+	margin-top: -6px; /* Centers thumb on the track */
+}
+
+.tempoSlider:disabled {
+	cursor: not-allowed;
+}
+
+.tempoInput[type="number"] {
+	width: 42px;
+	height: 20px;
+	color: white;
+	background-color: $menuDarkestColor;
+	border: 1px solid white;
+	border-radius: 5px;
+	text-align: center
+}
+
+.tempoInput:disabled {
+	background-color: $menuDarkColor;
+	color: grey;
+	cursor: not-allowed;
+}
+
+.tempoIcon {
+	display: inline-block;
+	width: 20px;
+	height: 20px;
+	background-image: url('../img/tempo.svg');
+	background-size: cover;
+	user-select: none;
+}
+
+.midiDeviceTable {
+	border-collapse: collapse;
+	width: 100%;
+	font-size: 13px;
+	border: 1px solid white;
+	margin: 16px 0;
+}
+
+.midiDeviceTable td, .midiDeviceTable th {
+	padding: 8px;
+}
+
+.midiDeviceTable th {
+	background-color: $menuDarkestColor;
+	border-bottom: 1px solid white;
+}
+
+.midiDeviceTable tr:nth-child(odd) {
+	background-color: $menuDarkColor;
+}
+
+.midiDeviceName {
+	text-align: left;
+}
+
+.midiDeviceEnable {
+	text-align: left;
+	width: 24px;
+}
+
+.checkboxLabel {
+	display: grid;
+	justify-content: space-evenly;
+}
+
+input[type="checkbox"] {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 18px;
+	height: 18px;
+	line-height: 18px;
+	background-color: $menuLightestColor;
+	border: 1px solid white;
+	border-radius: 3px;
+	cursor: pointer;
+	text-align: center;
+	display: grid;
+	place-content: center;
+	-webkit-transition: .3s;
+	transition: .3s;
+}
+
+input[type="checkbox"]:checked {
+	background-color: $modelBlackBarColor;
+	border: none;
+}
+
+input[type="checkbox"]:checked::before {
+	content: '✔';
+	display: block;
+	color: white;
+}
+
+input[type="checkbox"]:disabled {
+	background-color: $menuLightColor;
+	cursor: not-allowed;
 }
 
 #noteBarContainer {

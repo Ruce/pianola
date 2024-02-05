@@ -95,6 +95,7 @@ class PianolaModel {
 				if (autoCorrect && n.actor === Actor.Player) {
 					const numIntervals = (n.time - start) / interval; // Number of intervals between startTick and note
 					t = Math.floor((numIntervals + 0.5) / 2) * 2; // Fit the note to the closest even-numbered interval
+					t = Math.min(t, numNotes - 1); // But note needs to fit within the given window
 					duration = Math.max(Math.min(Math.round(n.duration / interval * 2) * 5, 999), 1); // Scale duration to have precision up to half an interval
 				} else {
 					t = Math.floor((n.time - start) / interval);
@@ -166,7 +167,7 @@ class PianolaModel {
 		}
 	}
 	
-	async generateNotes(history, start, end, interval, timesteps, numRepeats, selectionIdx) {
+	async generateNotes(history, start, end, interval, timesteps, numRepeats, selectionIdx, autoCorrectInput) {
 		/*
 		Arguments:
 			`history`: an array containing recent history of Notes that were played
@@ -183,7 +184,7 @@ class PianolaModel {
 		const delayMs = 200;
 		
 		if (this.isConnected) {
-			const queryString = PianolaModel.historyToQueryString(history, start, end, interval, true);
+			const queryString = PianolaModel.historyToQueryString(history, start, end, interval, autoCorrectInput);
 			console.log(new Date().toISOString(), 'Query:', queryString);
 			const data = await this.queryModel(queryString, timesteps, numRepeats, selectionIdx, maxRetries, delayMs);
 			console.log(new Date().toISOString(), 'Data:', data);

@@ -11,6 +11,7 @@
 {% include_relative history.js %}
 {% include_relative note.js %}
 {% include_relative notesCanvas.js %}
+{% include_relative midi.js %}
 
 
 const octaves = 5;
@@ -35,10 +36,12 @@ function initialisePage() {
 	notesCanvas = new NotesCanvas('notesCanvas', piano);
 	
 	initialiseVolumeSlider();
+	initialiseComposeMode(piano.mode);
+	initialiseTempoSettings(piano.defaultBpm, piano.autoDetectTempo);
+	initialiseInputSettings(piano.autoCorrectInput);
 	initialiseSeeds();
 	initialiseRewindReceiver();
 	initialiseSustainPedal();
-	closeMode(false); // Sets the mode radio button to the default in `piano`
 	
 	const historyPromise = loadHistory();
 	const tonePromise = Tone.ToneAudioBuffer.loaded()
@@ -51,7 +54,7 @@ function initialisePage() {
 	document.addEventListener('keydown', (event) => piano.keyDown(event));
 	document.addEventListener('keyup', (event) => piano.keyUp(event));
 	document.getElementById('introduction').onclick = function(event) { event.stopPropagation(); }
-	document.getElementById('modeMenu').onclick = function(event) { event.stopPropagation(); }
+	document.getElementById('settingsMenu').onclick = function(event) { event.stopPropagation(); }
 }
 
 function showLoader() {
@@ -113,6 +116,83 @@ function initialiseVolumeSlider() {
 			volumeButtonImage.classList.remove('volumeButtonOff');
 			document.getElementById('menuMuteTooltip').textContent = 'Mute';
 		}
+	});
+}
+
+function initialiseComposeMode(initialMode) {
+	const intialModeRadio = document.querySelector(`input[name="modeOptions"][value="${initialMode.name}"]`);
+	if (intialModeRadio) intialModeRadio.checked;
+	
+	document.getElementById('modeSelectionForm').addEventListener('change', (event) => {
+		const selectedRadio = document.querySelector('input[name="modeOptions"]:checked');
+		if (selectedRadio) {
+			const newMode = PianoMode.getModeByName(selectedRadio.value);
+			if (piano.mode !== newMode) {
+				piano.mode = newMode;
+				piano.resetAll();
+				if (piano.mode === PianoMode.Composer || piano.mode === PianoMode.Autoplay) {
+					connectToModel(model);
+				}
+			}
+		}
+	});
+}
+
+function initialiseTempoSettings(initialBpm, initialAutoDetectTempo) {
+	const slider = document.getElementById('tempoSlider');
+	const numInput = document.getElementById('tempoInput');
+	
+	slider.value = initialBpm;
+	numInput.value = initialBpm;
+	
+	slider.addEventListener('input', (event) => {
+		const newBpm = Math.round(slider.value);
+		numInput.value = newBpm;
+		piano.pianoAudio.setBpm(newBpm);
+	});
+	
+	numInput.addEventListener('change', (event) => {
+		let newBpm = parseInt(numInput.value);
+		const maxBpm = parseInt(numInput.max);
+		const minBpm = parseInt(numInput.min);
+		
+		if (newBpm > maxBpm) {
+			numInput.value = maxBpm;
+			newBpm = maxBpm;
+		} else if (newBpm < minBpm) {
+			numInput.value = minBpm;
+			newBpm = minBpm;
+		}
+		slider.value = newBpm;
+		piano.pianoAudio.setBpm(newBpm);
+	});
+	
+	numInput.addEventListener('keydown', (event) => event.stopPropagation());
+	
+	const autoDetectCheckbox = document.getElementById('tempoDetectEnable');
+	autoDetectCheckbox.checked = initialAutoDetectTempo;
+	toggleTempoInputs(autoDetectCheckbox.checked);
+	
+	autoDetectCheckbox.addEventListener("change", () => {
+		piano.autoDetectTempo = autoDetectCheckbox.checked;
+		toggleTempoInputs(autoDetectCheckbox.checked);
+	});
+}
+
+function toggleTempoInputs(toDisable) {
+	const slider = document.getElementById('tempoSlider');
+	const numInput = document.getElementById('tempoInput');
+	
+	slider.disabled = toDisable;
+	numInput.disabled = toDisable;
+}
+
+function initialiseInputSettings(initialAutoCorrectInput) {
+	const autoCorrectCheckbox = document.getElementById('autoCorrectEnable');
+	autoCorrectCheckbox.checked = initialAutoCorrectInput;
+	
+	autoCorrectCheckbox.addEventListener("change", () => {
+		piano.autoCorrectInput = autoCorrectCheckbox.checked;
 	});
 }
 
@@ -224,33 +304,12 @@ async function playShared() {
 	closeIntro();
 }
 
-function openMode() {
-	document.getElementById('modeOverlay').style.display = 'block';
+function openSettings() {
+	document.getElementById('settingsOverlay').style.display = 'block';
 }
 
-function closeMode(toSave) {
-	document.getElementById('modeOverlay').style.display = 'none';
-	
-	if (toSave) {
-		const selectedRadio = document.querySelector('input[name="modeOptions"]:checked');
-		if (selectedRadio) {
-			const newMode = PianoMode.getModeByName(selectedRadio.value);
-			if (piano.mode !== newMode) {
-				piano.mode = newMode;
-				piano.resetAll();
-				if (piano.mode === PianoMode.Composer || piano.mode === PianoMode.Autoplay) {
-					connectToModel(model);
-				}
-			}
-		}
-	} else {
-		const radioButtons = document.querySelectorAll('input[name="modeOptions"]');
-		for (const radioButton of radioButtons) {
-			if (radioButton.value === piano.mode.name) {
-				radioButton.checked = true;
-			}
-		}
-	}
+function closeSettings() {
+	document.getElementById('settingsOverlay').style.display = 'none';
 }
 
 function pauseFramesCheck() {

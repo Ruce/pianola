@@ -6,7 +6,7 @@ class Piano {
 		this.bufferBeats = 6;
 		this.bufferTicks = Tone.Time(`0:${this.bufferBeats}`).toTicks();
 		this.historyWindowBeats = 42;
-		this.defaultBPM = 80;
+		this.defaultBpm = 80;
 		
 		this.octaves = octaves;
 		this.ticksPerBeat = ticksPerBeat;
@@ -14,11 +14,11 @@ class Piano {
 		this.keyMapShift = 9;
 		this.keyMap = PianoKeyMap.getKeyMap(this.keyMapShift, this.pianoKeys.length);
 		this.pianoCanvas = new PianoCanvas(this, canvasId);
-		this.pianoAudio = new PianoAudio(this.defaultBPM, this.pianoKeys);
+		this.pianoAudio = new PianoAudio(this.defaultBpm, this.pianoKeys);
+		this.midiController = new PianolaMidi(this);
 		this.model = model;
 		this.historyController = historyController;
 		this.mode = PianoMode.Composer;
-		this.initialiseMidi();
 		
 		this.lastActivity = new Date();
 		this.modelStartTime = null;
@@ -32,6 +32,8 @@ class Piano {
 		this.pianoKeysDown = [];
 		this.sustain = false;
 		
+		this.autoDetectTempo = true;
+		this.autoCorrectInput = true;
 	}
 	
 	beatsToSeconds(beats) {
@@ -193,7 +195,7 @@ class Piano {
 			
 			// If note is scheduled to be released imminently, don't need to release it manually
 			const finalDuration = triggerTime - activeNote.time;
-			if (Math.abs(activeNote.duration - finalDuration) > 0.001) {
+			if (activeNote.duration === -1 || activeNote.duration - finalDuration > 0.001) {
 				this.pianoAudio.sampler.triggerRelease(pianoKey.keyName, Tone.now() + 0.01);
 				
 				// Update activeNote's final duration, which is also recorded in `noteHistory`
@@ -233,7 +235,7 @@ class Piano {
 		if (this.mode === PianoMode.Autoplay) {
 			const numRepeats = 3;
 			const selectionIdx = 1;
-			const generated = await this.model.generateNotes(history, start, end, this.getInterval(), this.bufferBeats * this.ticksPerBeat, numRepeats, selectionIdx);
+			const generated = await this.model.generateNotes(history, start, end, this.getInterval(), this.bufferBeats * this.ticksPerBeat, numRepeats, selectionIdx, this.autoCorrectInput);
 			
 			// Before scheduling notes, check that the model hasn't been restarted while this function was awaiting a response
 			if (this.modelStartTime !== null && initiatedTime >= this.modelStartTime) {
@@ -249,7 +251,7 @@ class Piano {
 		} else if (this.mode === PianoMode.Composer) {
 			const numRepeats = 7;
 			const selectionIdx = -1;
-			const options = await this.model.generateNotes(history, start, end, this.getInterval(), this.bufferBeats * this.ticksPerBeat, numRepeats, selectionIdx);
+			const options = await this.model.generateNotes(history, start, end, this.getInterval(), this.bufferBeats * this.ticksPerBeat, numRepeats, selectionIdx, this.autoCorrectInput);
 			
 			// Before scheduling notes, check that the model hasn't been restarted while this function was awaiting a response
 			if (this.modelStartTime !== null && initiatedTime >= this.modelStartTime) {
@@ -457,15 +459,14 @@ class Piano {
 		this.releaseAllNotes();
 		this.stopModel();
 		this.hideOptions();
-		Tone.Transport.cancel();
-		Tone.Transport.stop();
+		this.pianoAudio.stopTransport();
+		NProgress.done();
 		
 		this.historyController.addToHistoryList(this.currHistory, this);
 		this.currHistory = null;
 		this.activeNotes = [];
-		this.pianoAudio.transportStarted = false;
+		this.pianoKeysDown = [];
 		this.listeningToOption = false;
-		NProgress.done();
 		
 		if (typeof this.listenerIntervalId !== 'undefined') {
 			clearInterval(this.listenerIntervalId);
@@ -474,7 +475,7 @@ class Piano {
 	}
 	
 	startHistory() {
-		this.pianoAudio.setBPM(this.defaultBPM);
+		//this.pianoAudio.setBpm(this.defaultBpm);
 		if (this.mode === PianoMode.Freeplay) {
 			this.currHistory = new History(this.pianoAudio.bpm, "Free play");
 		} else {
@@ -503,9 +504,11 @@ class Piano {
 		if (this.modelStartTime === null) {
 			if (currTime - this.lastActivity >= inputWaitTime && this.activeNotes.length === 0) {
 				// Start the model:
-				// Detect tempo from user input
-				this.pianoAudio.bpm = PianoAudio.detectBpm(this.currHistory.noteHistory, 52, 100);
-				this.currHistory.bpm = this.pianoAudio.bpm;
+				if (this.autoDetectTempo) {
+					// Detect tempo from user input
+					this.pianoAudio.setBpm(PianoAudio.detectBpm(this.currHistory.noteHistory, 52, 100));
+					this.currHistory.bpm = this.pianoAudio.bpm;
+				}
 				
 				// To determine end time of the seed passage, round up the last note's time to an interval boundary
 				this.currHistory.lastSeedNoteTime = this.currHistory.noteHistory.at(-1).time;
@@ -542,7 +545,7 @@ class Piano {
 	
 	playExample(data, bpm, title) {
 		this.resetAll();
-		this.pianoAudio.setBPM(bpm);
+		this.pianoAudio.setBpm(bpm);
 		this.pianoAudio.startTransport();
 		this.lastActivity = new Date();
 		this.currHistory = new History(this.pianoAudio.bpm, title);
@@ -638,7 +641,7 @@ class Piano {
 		this.currHistory = new History(history.bpm, history.name);
 		this.currHistory.lastSeedNoteTime = history.noteHistory.at(-1).time;
 		this.currHistory.parentHistory = history;
-		this.pianoAudio.setBPM(history.bpm);
+		this.pianoAudio.setBpm(history.bpm);
 		this.pianoAudio.startTransport();
 		
 		if (this.notesCanvas) this.notesCanvas.activeBars = [];
@@ -699,31 +702,6 @@ class Piano {
 	
 	bindNotesCanvas(notesCanvas) {
 		this.notesCanvas = notesCanvas;
-	}
-	
-	initialiseMidi() {
-		this.midiAccess = null;
-		navigator.requestMIDIAccess().then((access) => {
-			this.midiAccess = access;
-			this.attachMidiListener(this.midiAccess);
-			
-			// If a new midi port is connected, attach the listener
-			this.midiAccess.onstatechange = (event) => {
-				if (event.port.type === 'input' && event.port.state === 'connected') {
-					this.attachMidiListener(this.midiAccess);
-				}
-			}
-		});
-	}
-	
-	attachMidiListener(midiAccess) {
-		midiAccess.inputs.forEach((input) => {
-			if (!input.onmidimessage) {
-				input.onmidimessage = (message) => {
-					this.onMidiMessage(message);
-				};
-			}
-		});
 	}
 	
 	onMidiMessage(message) {

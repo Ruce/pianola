@@ -34,15 +34,15 @@ layout: default
 	<div class="listener" id="listener"><p class="listenerText">Listening...</p></div>
 	<div class="menuContainer">
 		<button class="menuButton playButton">
-			<div class="menuButtonShape playButtonShape"></div>
+			<div class="menuButtonShape seedButtonShape"></div>
 			<ol id="exampleList"></ol>
 		</button>
-		<button class="menuButton" onclick="stopMusic()"><div class="menuButtonShape stopButtonShape"></div><div class="menuButtonTooltip">Stop (space)</div></button>
+		<button class="menuButton" onclick="stopMusic()"><div class="menuButtonShape stopButtonShape"></div><div class="menuButtonTooltip">Save & Stop (space)</div></button>
 		<button class="menuButton" onclick="rewindMusic()"><div class="menuButtonShape rewindButtonShape"></div><div class="menuButtonTooltip">Rewind (←)</div></button>
 		<button class="menuButton" onclick="toggleMute()"><div class="menuButtonShape volumeButtonShape" id="volumeButtonImage"></div><div class="menuButtonTooltip" id="menuMuteTooltip">Mute</div></button>
 		<input type="range" class="volumeSlider" id="volumeSlider" min="0" max="100" value="85">
 		<div class="verticalSeparator"></div>
-		<button class="menuButton" onclick="openMode()"><div class="menuButtonShape modeButtonShape"></div><div class="menuButtonTooltip">Mode</div></button>
+		<button class="menuButton" onclick="openSettings()"><div class="menuButtonShape settingsButtonShape"></div><div class="menuButtonTooltip">Settings</div></button>
 		<button class="menuButton" onclick="openIntro()"><div class="menuButtonShape helpButtonShape"><div class="helpButtonInner">i</div></div><div class="menuButtonTooltip">Help</div></button>
 	</div>
 </div>
@@ -54,7 +54,7 @@ layout: default
 		<span><i>(noun) A self-playing, self-composing AI piano.</i></span></div>
 		<div id="introText">
 			<p>Welcome to Pianola!</p>
-			<p>Start creating music by playing a short snippet or selecting an example seed from the Play menu. Switch between Composer, Autoplay, and Free Play in the Mode menu for different playstyles!</p>
+			<p>Start creating music by playing a short snippet or selecting an example seed from the Play menu. Switch between Composer, Autoplay, and Free Play in the settings for different playstyles!</p>
 			<div id="noteBarContainer">
 				<div class="noteBarSection">
 					<h4>Your Notes</h4>
@@ -84,40 +84,80 @@ layout: default
 					<p>You can also create your own pieces by prompting the AI with a short snippet or an example seed from the Play menu.</p>
 				</div>
 			</div>
-			<button class="overlayButton" id="introSharedPlay" onclick="playShared()">Let's Roll</button>
+			<button class="overlayButton" id="introSharedPlay" onclick="playShared()">Cue the Music!</button>
 		</div>
 		<span id="introFooter"><i>For technical information, see the <a href="https://github.com/Ruce/pianola" target="_blank" rel="noopener noreferrer">GitHub repository</a></i></span>
 	</div>
 </div>
-<div class="overlay" id="modeOverlay">
-	<div id="modeMenu">
-		<div class="definitionText"><h2>Mode</h2></div>
-		<form>
-			<label class="modeOption">
-				<input type="radio" name="modeOptions" value="composer" checked>
-				<div class="modeBox">
-					<span class="modeOptionTitle">Composer</span>
-					<p class="modeOptionText">Choose from various generated options to compose your own piece</p>
+<div class="overlay" id="settingsOverlay" onclick="closeSettings()">
+	<div id="settingsMenu">
+		<button class="closeButton" onclick="closeSettings()"></button>
+		<h2 class="settingsHeader">Settings</h2>
+		<div class="settingsContainer">
+			<div class="settingsSubContainer">
+				<div class="settingsSubHeader">Compose Mode</div>
+				<form id="modeSelectionForm">
+					<label class="modeOption">
+						<input type="radio" name="modeOptions" value="composer" checked>
+						<div class="modeBox">
+							<span class="modeOptionTitle">Composer</span>
+							<p class="modeOptionText">Choose from various generated options to compose your own piece</p>
+						</div>
+					</label>
+					<label class="modeOption">
+						<input type="radio" name="modeOptions" value="autoplay">
+						<div class="modeBox">
+							<span class="modeOptionTitle">Autoplay</span>
+							<p class="modeOptionText">Let Pianola compose and play continuously by itself</p>
+						</div>
+					</label>
+					<label class="modeOption">
+						<input type="radio" name="modeOptions" value="freeplay">
+						<div class="modeBox">
+							<span class="modeOptionTitle">Free Play</span>
+							<p class="modeOptionText">Disable music generation to just play the piano</p>
+						</div>
+					</label>
+				</form>
+			</div>
+			<div class="settingsSubContainer">
+				<div class="settingsSubHeader">Tempo</div>
+				<div class="tempoSliderContainer">
+					<div class="tempoIcon"></div>
+					<input type="range" class="tempoSlider" id="tempoSlider" min=40 max=140 value=100>
+					<input type="number" class="tempoInput" id="tempoInput" min=40 max=140 value=100>
 				</div>
-			</label>
-			<label class="modeOption">
-				<input type="radio" name="modeOptions" value="autoplay">
-				<div class="modeBox">
-					<span class="modeOptionTitle">Autoplay</span>
-					<p class="modeOptionText">Let Pianola compose and play continuously by itself</p>
+				<div class="textSettingsContainer tempoDetectContainer">
+					<label for="tempoDetectEnable">Auto-detect tempo from notes played (beats per minute)</label>
+					<label class="switch">
+						<input id="tempoDetectEnable" type="checkbox" checked>
+						<span class="slider"></span>
+					</label>
 				</div>
-			</label>
-			<label class="modeOption">
-				<input type="radio" name="modeOptions" value="freeplay">
-				<div class="modeBox">
-					<span class="modeOptionTitle">Free Play</span>
-					<p class="modeOptionText">Disable music generation to just play the piano</p>
+			</div>
+			<div class="settingsSubContainer">
+				<div class="settingsSubHeader">Input Options</div>
+				<div class="textSettingsContainer autoCorrectContainer">
+					<label for="autoCorrectEnable">Auto-correct input note timings</label>
+					<label class="switch">
+						<input id="autoCorrectEnable" type="checkbox" checked>
+						<span class="slider"></span>
+					</label>
 				</div>
-			</label>
-		</form>
-		<div class="modeButtonsContainer">
-			<button class="overlayButton" id="modeCancel" onclick="closeMode(false)">Cancel</button>
-			<button class="overlayButton" id="modeSelect" onclick="closeMode(true)">Select</button>
+				<table class="midiDeviceTable" id="midiDeviceTable">
+					<thead>
+						<tr>
+							<th class="midiDeviceEnable"></th>
+							<th class="midiDeviceName">MIDI Device</th>
+						</tr>
+					</thead>
+					<tbody>
+					</tbody>
+				</table>
+			</div>
+		</div>
+		<div class="settingsBlock" id="settingsBlock">
+			<span class="settingsBlockText">Settings cannot be changed while a piece is ongoing - Save & Stop to edit settings<span>
 		</div>
 	</div>
 </div>

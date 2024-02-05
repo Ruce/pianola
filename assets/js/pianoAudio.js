@@ -55,9 +55,13 @@ class PianoAudio {
 		return bestBpm;
 	}
 
-	setBPM(bpm) {
+	setBpm(bpm) {
 		Tone.Transport.bpm.value = bpm;
 		this.bpm = bpm;
+		
+		// Set BPM values in the settings menu
+		document.getElementById('tempoSlider').value = bpm;
+		document.getElementById('tempoInput').value = bpm;
 	}
 
 	initialiseSampler(pianoKeys) {
@@ -96,11 +100,27 @@ class PianoAudio {
 		// Returns true if Transport was just started, otherwise returns false (i.e. if Transport had already been started)
 		if (!this.transportStarted) { 
 			Tone.Transport.start();
+			this.blockSettings();
 			this.transportStarted = true;
 			return true;
 		} else {
 			return false;
 		}
+	}
+	
+	stopTransport() {
+		Tone.Transport.cancel();
+		Tone.Transport.stop();
+		this.unblockSettings();
+		this.transportStarted = false;
+	}
+	
+	blockSettings() {
+		document.getElementById('settingsBlock').style.display = 'flex';
+	}
+	
+	unblockSettings() {
+		document.getElementById('settingsBlock').style.display = 'none';
 	}
 	
 	updateContextDateTime() {
